@@ -68,8 +68,15 @@ npm run format
 ### Local Development
 
 ```bash
-# Build and run locally
-npm run build && node bin/nextforge.js --help
+# Install dependencies
+npm i
+
+# Build the project
+npm run build
+
+# Test the CLI
+node bin/nextforge.js --help
+node bin/nextforge.js doctor
 
 # Development mode (requires tsx)
 npm run dev
