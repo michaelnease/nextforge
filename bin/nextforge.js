@@ -1,14 +1,15 @@
 #!/usr/bin/env node
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Import the compiled JavaScript from dist
-const { main } = await import(join(__dirname, '../dist/index.js'));
+const mod = await import(join(__dirname, "../dist/index.js"));
+const main = typeof mod.main === "function" ? mod.main : null;
+if (!main) {
+  console.error("nextforge: dist/index.js did not export main()");
+  process.exit(1);
+}
 
-main();
+await main();

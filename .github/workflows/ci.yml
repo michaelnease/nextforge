@@ -2,48 +2,48 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   lint-typecheck-test-build:
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         node-version: [18, 20]
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Run ESLint
-      run: npm run lint
-      
-    - name: Run Prettier check
-      run: npm run format:check
-      
-    - name: Run TypeScript type check
-      run: npm run typecheck
-      
-    - name: Run tests
-      run: npm run test:run
-      
-    - name: Build project
-      run: npm run build
-      
-    - name: Test built CLI
-      run: node bin/nextforge.js --help
-      
-    - name: Test doctor command
-      run: node bin/nextforge.js doctor
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Prettier check
+        run: npm run format:check
+
+      - name: Run TypeScript type check
+        run: npm run typecheck
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Test built CLI
+        run: node bin/nextforge.js --help
+
+      - name: Test doctor command
+        run: node bin/nextforge.js doctor

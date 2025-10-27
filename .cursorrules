@@ -1,0 +1,71 @@
+{
+  "rules": [
+    {
+      "description": "Always write clean, modern, idiomatic TypeScript with ES module syntax.",
+      "patterns": ["**/*.ts", "**/*.tsx"],
+      "instructions": [
+        "Use named exports over default exports unless exporting a React component or CLI entry.",
+        "Prefer const and let over var.",
+        "Always use async/await for async code instead of .then() chains.",
+        "Use TypeScript interfaces or types for data shapes, never implicit any.",
+        "Keep imports sorted: Node built-ins, external packages, internal modules."
+      ]
+    },
+    {
+      "description": "Respect formatting and lint rules.",
+      "patterns": ["**/*.{ts,tsx,js,jsx,json,md}"],
+      "instructions": [
+        "Match existing Prettier formatting (2 spaces, 100 line width, trailing commas).",
+        "Avoid manual alignment or non-standard whitespace.",
+        "Use single quotes in code but double quotes in JSON."
+      ]
+    },
+    {
+      "description": "When editing Next.js or Nx projects, preserve framework conventions.",
+      "patterns": ["apps/**", "packages/**", "src/**"],
+      "instructions": [
+        "Do not remove 'use client' or 'use server' unless refactoring runtime boundaries.",
+        "Keep imports from 'next/*' as-is unless migrating across major versions.",
+        "Preserve Nx executor or generator schemas when editing workspace files."
+      ]
+    },
+    {
+      "description": "Follow project documentation and style conventions.",
+      "patterns": ["README.md", "docs/**"],
+      "instructions": [
+        "Keep Markdown headings consistent (H2 for sections, H3 for subsections).",
+        "Use code blocks with explicit languages (e.g., ```ts, ```bash).",
+        "Prefer concise technical explanations, no marketing copy."
+      ]
+    },
+    {
+      "description": "When generating new code, prefer clarity over brevity.",
+      "patterns": ["src/**"],
+      "instructions": [
+        "Favor explicit variable names over short ones.",
+        "Add JSDoc for exported functions and classes in CLI utilities.",
+        "Use dependency injection or parameter passing instead of global variables.",
+        "Avoid magic strings or numbers — define constants instead."
+      ]
+    },
+    {
+      "description": "When modifying configs or scripts, ensure cross-platform compatibility.",
+      "patterns": ["scripts/**", "**/*.mjs", "**/*.cjs"],
+      "instructions": [
+        "Use Node APIs instead of shell-specific syntax.",
+        "Avoid bash-only features like && or $() when possible.",
+        "Prefer path.join and import.meta.url for file resolution."
+      ]
+    },
+    {
+      "description": "General AI behavior guidelines.",
+      "patterns": ["**/*"],
+      "instructions": [
+        "Never remove comments that mention TODO, FIXME, or important context.",
+        "Do not over-refactor working code unless the user explicitly requests a refactor.",
+        "When adding new files, include a header comment briefly explaining the purpose.",
+        "Preserve author style and naming conventions."
+      ]
+    }
+  ]
+}

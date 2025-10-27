@@ -1,23 +1,14 @@
-#!/usr/bin/env node
+import { Command } from "commander";
 
-import { Command } from 'commander';
-import { doctorCommand } from './commands/doctor.js';
+import { doctorCommand } from "./commands/doctor.js";
 
-const program = new Command();
+export async function main(): Promise<void> {
+  const program = new Command()
+    .name("nextforge")
+    .description("A CLI tool for Next.js project scaffolding and management")
+    .version("0.1.0");
 
-program
-  .name('nextforge')
-  .description('A CLI tool for Next.js project scaffolding and management')
-  .version('0.1.0');
+  program.addCommand(doctorCommand);
 
-// Add doctor command
-program.addCommand(doctorCommand);
-
-export function main(): void {
-  program.parse();
-}
-
-// Only run main if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+  await program.parseAsync(process.argv);
 }

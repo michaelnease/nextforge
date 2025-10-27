@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
+import { EOL } from "node:os";
 import { createWriteStream, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -8,7 +9,9 @@ import archiver from "archiver";
 import pc from "picocolors";
 
 function run(cmd) {
-  return execSync(cmd, { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
+  return execSync(cmd, { stdio: ["ignore", "pipe", "pipe"] })
+    .toString()
+    .trim();
 }
 
 function arg(name, fallback) {
@@ -17,10 +20,12 @@ function arg(name, fallback) {
   return fallback;
 }
 
+const REF_RE = /^[A-Za-z0-9._/\-]+$/;
+
 function nowStamp() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
 }
 
 function safeRel(p) {
@@ -41,15 +46,8 @@ function filterOut(file) {
     "^temp/",
     "^scripts/temp/",
   ];
-  const hidden = [
-    "^\\.",
-    "/\\.",
-  ];
-  const exts = [
-    "\\.map$",
-    "\\.log$",
-    "\\.lock$",
-  ];
+  const hidden = ["^\\.", "/\\."];
+  const exts = ["\\.map$", "\\.log$", "\\.lock$"];
   const all = new RegExp(`(${[...patterns, ...hidden, ...exts].join("|")})`);
   return all.test(file);
 }
@@ -70,13 +68,21 @@ function main() {
     } else {
       // default base is the merge-base with origin/main if present, else main, else the previous commit
       let mainRef = "origin/main";
-      try { run("git rev-parse --verify origin/main"); } catch { mainRef = "main"; }
+      try {
+        run("git rev-parse --verify origin/main");
+      } catch {
+        mainRef = "main";
+      }
       try {
         base = run(`git merge-base ${mainRef} ${head}`);
       } catch {
         base = run(`git rev-parse ${head}^`);
       }
     }
+
+    // Validate refs
+    if (!REF_RE.test(head)) throw new Error("Invalid ref for --head");
+    if (base && !REF_RE.test(base)) throw new Error("Invalid ref for --base/--since");
 
     // Get diff file list
     const diffCmd = `git diff --name-status -M -C ${base} ${head}`;
@@ -112,14 +118,23 @@ function main() {
       .filter((p) => p && existsSync(p))
       .filter((p) => !filterOut(p));
 
-    if (files.length === 0) {
+    const deletedFiles = changes
+      .filter((c) => c.status === "D")
+      .map((c) => c.path)
+      .filter((p) => p);
+
+    if (files.length === 0 && deletedFiles.length === 0) {
       console.log(pc.yellow("No remaining files to zip after filters."));
       process.exit(0);
     }
 
     // Prepare output
     const branch = (() => {
-      try { return run("git rev-parse --abbrev-ref HEAD"); } catch { return "detached"; }
+      try {
+        return run("git rev-parse --abbrev-ref HEAD");
+      } catch {
+        return "detached";
+      }
     })();
     const shortHead = run(`git rev-parse --short ${head}`);
     const outDir = path.join("scripts", "temp");
@@ -140,7 +155,9 @@ function main() {
     manifestLines.push(`files:`);
 
     archive.on("warning", (err) => console.warn(pc.yellow(String(err))));
-    archive.on("error", (err) => { throw err; });
+    archive.on("error", (err) => {
+      throw err;
+    });
 
     archive.pipe(output);
 
@@ -154,10 +171,19 @@ function main() {
       added++;
     }
 
+    // Add deleted files to manifest
+    if (deletedFiles.length > 0) {
+      manifestLines.push(``);
+      manifestLines.push(`deleted:`);
+      for (const f of deletedFiles) {
+        manifestLines.push(`  - path: ${f}`);
+      }
+    }
+
     // Include git summary
     const log = run(`git log --oneline -n 20 ${base}..${head}`);
     manifestLines.push(``);
-    manifestLines.push(`git_log_last_20:`); 
+    manifestLines.push(`git_log_last_20:`);
     for (const line of log.split("\n")) {
       manifestLines.push(`  - ${line}`);
     }
