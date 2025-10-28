@@ -21,6 +21,7 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 ### 📦 **Built-in Utilities**
 
 - **Doctor command** for project diagnostics
+- **Route group generator** for Next.js App Router
 - **PR diff zipper** for change tracking
 - **Build verification** with smoke tests
 - **Package validation** with npm pack checks
@@ -31,6 +32,7 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 - **Hot reload development** (`npm run dev`)
 - **Automatic formatting** and linting
 - **Comprehensive error handling**
+- **Smart input validation** and sanitization
 
 ### 📋 **Project Management**
 
@@ -73,6 +75,96 @@ nextforge --version
 
 # Run project diagnostics
 nextforge doctor
+
+# Create Next.js route groups
+nextforge add:group <name> [options]
+```
+
+### Route Group Generation
+
+Create Next.js App Router route groups with optional child pages:
+
+```bash
+# Basic route group
+nextforge add:group auth
+
+# With layout and child pages
+nextforge add:group auth --with-layout --pages signin,signup,reset
+
+# Custom app directory
+nextforge add:group dashboard --app apps/web/app --pages overview,settings
+
+# Skip README generation
+nextforge add:group marketing --no-readme --pages landing,about
+
+# Overwrite existing files
+nextforge add:group auth --force --with-layout --pages signin,signup
+
+# Complex nested segments
+nextforge add:group admin --pages "users,[slug],settings/notifications"
+```
+
+#### Route Group Options
+
+- `--app <dir>` - App directory (default: "app")
+- `--with-layout` - Create layout.tsx in the group
+- `--no-readme` - Skip creating a README.md
+- `--force` - Overwrite existing files
+- `--pages <list>` - Comma-separated child segments to seed
+
+#### Supported Segment Patterns
+
+- **Static segments**: `signin`, `dashboard`, `settings`
+- **Dynamic segments**: `[slug]`, `[id]`, `[category]`
+- **Catch-all routes**: `[...slug]`, `[...rest]`
+- **Optional catch-all**: `[[...slug]]`, `[[...maybe]]`
+- **Nested segments**: `admin/settings`, `users/profile`
+
+#### Security Features
+
+- **Path traversal protection**: Blocks `..` and `.` segments
+- **Input sanitization**: Trims spaces and removes leading/trailing slashes
+- **Deduplication**: Prevents duplicate segments
+- **Validation**: Regex patterns ensure only valid Next.js route segments
+
+#### Generated Files
+
+The `add:group` command creates:
+
+```
+app/(auth)/
+├── README.md              # Route group documentation
+├── layout.tsx             # Optional group layout (--with-layout)
+├── signin/
+│   └── page.tsx          # Generated page component
+├── signup/
+│   └── page.tsx          # Generated page component
+└── [slug]/
+    └── page.tsx          # Dynamic route page
+```
+
+**Generated Layout Template:**
+
+```tsx
+import React, { type ReactNode } from "react";
+
+export default function GroupLayout({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+```
+
+**Generated Page Template:**
+
+```tsx
+import React from "react";
+
+export default async function Page() {
+  return (
+    <section className="p-8">
+      <h1 className="text-2xl font-semibold">Page Title</h1>
+    </section>
+  );
+}
 ```
 
 ### Development Commands
@@ -154,10 +246,15 @@ npm run cli -- --help
 
 ```
 src/
-├── index.ts              # Main CLI entry point
+├── index.ts                    # Main CLI entry point
 ├── commands/
-│   └── doctor.ts         # Doctor command implementation
-└── build-smoke.test.ts   # Build verification test
+│   ├── doctor.ts              # Doctor command implementation
+│   └── add/
+│       └── group.ts           # Route group generator
+├── build-smoke.test.ts        # Build verification test
+└── scripts/
+    ├── zip-pr-diff.mjs        # PR diff zipper utility
+    └── README-zip-pr-diff.md  # Zipper documentation
 ```
 
 ## Technical Specifications
