@@ -8,6 +8,7 @@ describe("Build smoke test", () => {
     expect(existsSync("dist/index.d.ts")).toBe(true);
 
     // Use dynamic import to avoid build-time resolution issues
+    // eslint-disable-next-line import/no-unresolved
     const mod = await import("../dist/index.js");
     expect(typeof mod.main).toBe("function");
   });

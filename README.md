@@ -1,6 +1,38 @@
 # @forged/nextforge
 
-A CLI tool for Next.js project scaffolding and management.
+A modern CLI tool for Next.js project scaffolding and management, built with TypeScript and ESM.
+
+## Features
+
+### 🏗️ **Modern CLI Architecture**
+- **ESM-only** Node.js 18.18+ support
+- **TypeScript** with full type safety
+- **Commander.js** for robust argument parsing
+- **Cross-platform** compatibility
+
+### 🔧 **Development Tools**
+- **ESLint + Prettier** for code quality
+- **Vitest** for fast testing
+- **TypeScript declarations** for library consumers
+- **Comprehensive CI/CD** with GitHub Actions
+
+### 📦 **Built-in Utilities**
+- **Doctor command** for project diagnostics
+- **PR diff zipper** for change tracking
+- **Build verification** with smoke tests
+- **Package validation** with npm pack checks
+
+### 🚀 **Developer Experience**
+- **One-command verification** (`npm run verify`)
+- **Hot reload development** (`npm run dev`)
+- **Automatic formatting** and linting
+- **Comprehensive error handling**
+
+### 📋 **Project Management**
+- **Git integration** for change tracking
+- **Manifest generation** with file checksums
+- **Dependency validation** and security checks
+- **Cross-platform script execution**
 
 ## Quick start
 
@@ -25,15 +57,46 @@ npx @forged/nextforge
 
 ## Usage
 
+### CLI Commands
+
 ```bash
-# Show help
+# Show help and available commands
 nextforge --help
 
-# Show version
+# Show version information
 nextforge --version
 
-# Run diagnostic checks
+# Run project diagnostics
 nextforge doctor
+```
+
+### Development Commands
+
+```bash
+# Run all quality checks
+npm run verify
+
+# Development with hot reload
+npm run dev
+
+# Build and test
+npm run build && npm test
+
+# Format and lint
+npm run format && npm run lint:fix
+```
+
+### Utility Scripts
+
+```bash
+# Create PR diff zip
+npm run zip:pr
+
+# Test specific commit range
+npm run zip:pr -- --base HEAD~5 --head HEAD
+
+# Since last tag
+npm run zip:pr -- --since $(git describe --tags --abbrev=0)
 ```
 
 ## Development
@@ -52,17 +115,14 @@ This project uses:
 # Install dependencies
 npm install
 
-# Build the project
-npm run build
+# Run all checks (recommended)
+npm run verify
 
-# Run tests
-npm test
-
-# Run linting
-npm run lint
-
-# Format code
-npm run format
+# Or run individual commands
+npm run build    # Build the project
+npm test         # Run tests
+npm run lint     # Run linting
+npm run format   # Format code
 ```
 
 ### Local Development
@@ -94,6 +154,31 @@ src/
 │   └── doctor.ts         # Doctor command implementation
 └── build-smoke.test.ts   # Build verification test
 ```
+
+## Technical Specifications
+
+### Runtime Requirements
+- **Node.js** >= 18.18.0
+- **ESM-only** modules (no CommonJS)
+- **TypeScript** 5.3+ for development
+
+### Build Output
+- **ES2022** target with NodeNext module resolution
+- **TypeScript declarations** (`.d.ts` files)
+- **Source maps** for debugging
+- **Tree-shakeable** exports
+
+### Code Quality
+- **ESLint** with TypeScript rules
+- **Prettier** formatting (100 char width)
+- **Import sorting** and organization
+- **Consistent naming** conventions
+
+### Testing & CI
+- **Vitest** for unit testing
+- **GitHub Actions** CI/CD
+- **Multi-Node** testing (18.x, 20.x)
+- **Build verification** with smoke tests
 
 ## Requirements
 
