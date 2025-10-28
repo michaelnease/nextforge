@@ -1,6 +1,8 @@
+// src/main.ts (or wherever your entry is)
 import { Command } from "commander";
 
 import { registerAddGroup } from "./commands/add/group.js";
+import { registerAddPage } from "./commands/add/page.js"; // ⬅ add this
 import { doctorCommand } from "./commands/doctor.js";
 
 export async function main(): Promise<void> {
@@ -9,9 +11,9 @@ export async function main(): Promise<void> {
     .description("Forge pages, APIs, and components for modern Next.js apps")
     .version("0.1.0");
 
-  // Note: doctorCommand must be invoked to get the Command instance
-  program.addCommand(doctorCommand); // ✅ pass the instance
+  program.addCommand(doctorCommand);
   registerAddGroup(program);
+  registerAddPage(program);
 
   await program.parseAsync(process.argv);
 }
