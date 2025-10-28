@@ -41,8 +41,8 @@
     "prepublishOnly": "npm run clean && npm run build",
     "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
     "docker:down": "docker compose -f docker-compose.dev.yml down",
-    "docker:build": "docker build -t demoapp:prod .",
-    "docker:run": "docker run -p 4000:4000 demoapp:prod"
+    "docker:build": "docker build -t testapp:prod .",
+    "docker:run": "docker run -p 3000:3000 testapp:prod"
   },
   "keywords": [
     "cli",

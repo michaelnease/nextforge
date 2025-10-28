@@ -51,6 +51,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # For smallest images, set output: "standalone" in next.config.mjs
+# Uncomment the following line to disable telemetry during build:
+# ENV NEXT_TELEMETRY_DISABLED=1
 RUN --mount=type=cache,target=/app/.next/cache \\
     if [ -f pnpm-lock.yaml ]; then pnpm run build; \\
     elif [ -f yarn.lock ]; then yarn run build; \\
@@ -63,6 +65,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=${port}
 ENV HOSTNAME=0.0.0.0
+# Uncomment the following line to disable telemetry during runtime:
+# ENV NEXT_TELEMETRY_DISABLED=1
 
 # non-root user
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
@@ -81,10 +85,7 @@ RUN mkdir -p .next && chown nextjs:nodejs .next
 EXPOSE ${port}
 
 # If standalone build produced server.js, run it; else run next start
-CMD if [ -f server.js ]; then node server.js; \\
-  elif [ -f pnpm-lock.yaml ]; then pnpm start -p $PORT; \\
-  elif [ -f yarn.lock ]; then yarn start -p $PORT; \\
-  else npm run start -- -p $PORT; fi
+CMD if [ -f server.js ]; then node server.js; else npx --yes next start -p $PORT; fi
 `;
 }
 
@@ -188,9 +189,8 @@ jspm_packages/
 # Nuxt.js build / generate output
 .nuxt
 
-# Gatsby files
+# Gatsby files (keep Next.js public/)
 .cache/
-public
 
 # Storybook build outputs
 .out
@@ -287,7 +287,6 @@ export function registerAddDocker(program: Command) {
   program
     .command("add:docker")
     .description("Generate Docker configuration files for Next.js app")
-    .option("--pm <npm|pnpm|yarn>", "Package manager", "npm")
     .option("--node <version>", "Node.js version", "22")
     .option("--port <number>", "Port number", "3000")
     .option("--image <name>", "Docker image name", "myapp")
@@ -295,7 +294,6 @@ export function registerAddDocker(program: Command) {
     .option("--force", "Overwrite existing files")
     .action(
       async (opts: {
-        pm: "npm" | "pnpm" | "yarn";
         node: string;
         port: string;
         image: string;
@@ -304,11 +302,6 @@ export function registerAddDocker(program: Command) {
       }) => {
         try {
           const createdFiles: string[] = [];
-
-          // Validate package manager
-          if (!["npm", "pnpm", "yarn"].includes(opts.pm)) {
-            throw new Error(`Invalid package manager "${opts.pm}". Use npm, pnpm, or yarn.`);
-          }
 
           // Validate Node version
           const nodeVersion = opts.node;
@@ -369,7 +362,6 @@ export function registerAddDocker(program: Command) {
           }
 
           console.log(`\nDocker configuration generated with:`);
-          console.log(`- Package manager: ${opts.pm}`);
           console.log(`- Node.js version: ${nodeVersion}`);
           console.log(`- Port: ${port}`);
           if (opts.compose) {
