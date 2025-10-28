@@ -5,30 +5,35 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 ## Features
 
 ### 🏗️ **Modern CLI Architecture**
+
 - **ESM-only** Node.js 18.18+ support
 - **TypeScript** with full type safety
 - **Commander.js** for robust argument parsing
 - **Cross-platform** compatibility
 
 ### 🔧 **Development Tools**
+
 - **ESLint + Prettier** for code quality
 - **Vitest** for fast testing
 - **TypeScript declarations** for library consumers
 - **Comprehensive CI/CD** with GitHub Actions
 
 ### 📦 **Built-in Utilities**
+
 - **Doctor command** for project diagnostics
 - **PR diff zipper** for change tracking
 - **Build verification** with smoke tests
 - **Package validation** with npm pack checks
 
 ### 🚀 **Developer Experience**
+
 - **One-command verification** (`npm run verify`)
 - **Hot reload development** (`npm run dev`)
 - **Automatic formatting** and linting
 - **Comprehensive error handling**
 
 ### 📋 **Project Management**
+
 - **Git integration** for change tracking
 - **Manifest generation** with file checksums
 - **Dependency validation** and security checks
@@ -158,23 +163,27 @@ src/
 ## Technical Specifications
 
 ### Runtime Requirements
+
 - **Node.js** >= 18.18.0
 - **ESM-only** modules (no CommonJS)
 - **TypeScript** 5.3+ for development
 
 ### Build Output
+
 - **ES2022** target with NodeNext module resolution
 - **TypeScript declarations** (`.d.ts` files)
 - **Source maps** for debugging
 - **Tree-shakeable** exports
 
 ### Code Quality
+
 - **ESLint** with TypeScript rules
 - **Prettier** formatting (100 char width)
 - **Import sorting** and organization
 - **Consistent naming** conventions
 
 ### Testing & CI
+
 - **Vitest** for unit testing
 - **GitHub Actions** CI/CD
 - **Multi-Node** testing (18.x, 20.x)
