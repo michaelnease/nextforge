@@ -24,18 +24,13 @@ async function writeIfAbsent(filePath: string, contents: string, force = false):
 
 function dockerfileTemplate(nodeVersion: string, port: number): string {
   return `# syntax=docker/dockerfile:1.7
-# Multi-stage Dockerfile for Next.js production
 FROM node:${nodeVersion}-alpine AS base
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
-# Install dependencies only when needed
 FROM base AS deps
-# libc6-compat helps some native deps on alpine
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
-# Install dependencies based on lockfile present
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
 RUN --mount=type=cache,target=/root/.npm \\
     --mount=type=cache,target=/root/.pnpm-store \\
@@ -45,13 +40,11 @@ RUN --mount=type=cache,target=/root/.npm \\
     elif [ -f package-lock.json ]; then npm ci; \\
     else echo "Lockfile not found." && exit 1; fi
 
-# Build
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# For smallest images, set output: "standalone" in next.config.mjs
-# Uncomment the following line to disable telemetry during build:
+RUN mkdir -p public
 # ENV NEXT_TELEMETRY_DISABLED=1
 RUN --mount=type=cache,target=/app/.next/cache \\
     if [ -f pnpm-lock.yaml ]; then pnpm run build; \\
@@ -59,45 +52,39 @@ RUN --mount=type=cache,target=/app/.next/cache \\
     elif [ -f package-lock.json ]; then npm run build; \\
     else echo "Lockfile not found." && exit 1; fi
 
-# Production runner
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=${port}
 ENV HOSTNAME=0.0.0.0
-# Uncomment the following line to disable telemetry during runtime:
+ENV NODE_OPTIONS=--max-old-space-size=1536
 # ENV NEXT_TELEMETRY_DISABLED=1
 
-# non-root user
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-USER nextjs
 
-# public assets
-COPY --from=builder /app/public ./public || true
-
-# Prefer standalone; fall back to regular .next + node_modules if not present
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./ || true
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next || true
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules || true
-RUN mkdir -p .next && chown nextjs:nodejs .next
+
+RUN mkdir -p .next && chown -R nextjs:nodejs /app
+USER nextjs
 
 EXPOSE ${port}
 
-# If standalone build produced server.js, run it; else run next start
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \\
+  CMD node -e "require('http').get('http://127.0.0.1:${port}/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+
 CMD if [ -f server.js ]; then node server.js; else npx --yes next start -p $PORT; fi
 `;
 }
 
 function dockerfileDevTemplate(nodeVersion: string, port: number): string {
   return `# syntax=docker/dockerfile:1.7
-# Development Dockerfile for Next.js
 FROM node:${nodeVersion}-alpine
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install dependencies based on lockfile present
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
 RUN --mount=type=cache,target=/root/.npm \\
     --mount=type=cache,target=/root/.pnpm-store \\
@@ -107,7 +94,6 @@ RUN --mount=type=cache,target=/root/.npm \\
     elif [ -f package-lock.json ]; then npm ci; \\
     else echo "Lockfile not found." && exit 1; fi
 
-# Source will be bind-mounted in compose
 COPY . .
 
 EXPOSE ${port} 9229
@@ -222,6 +208,17 @@ Thumbs.db
 
 # Misc
 *.tsbuildinfo
+
+# Test and tooling outputs
+playwright-report
+test-results
+cypress
+.turbo
+.nx
+.next/cache
+
+# Docker
+docker-compose*.yml
 `;
 }
 
@@ -237,8 +234,8 @@ async function addDockerScriptsToPackageJson(port: number, image: string, force 
     const scriptsToAdd: Record<string, string> = {
       "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
       "docker:down": "docker compose -f docker-compose.dev.yml down",
-      "docker:build": `docker build -t ${image}:prod .`,
-      "docker:run": `docker run -p ${port}:${port} ${image}:prod`,
+      "docker:build": `docker build --platform=linux/amd64 -t ${image}:prod .`,
+      "docker:run": `docker run --rm --name ${image}-prod -p ${port}:${port} ${image}:prod`,
     };
 
     let modified = false;
@@ -260,6 +257,7 @@ async function addDockerScriptsToPackageJson(port: number, image: string, force 
     console.error(`❌ Failed to update package.json: ${err instanceof Error ? err.message : err}`);
   }
 }
+
 function dockerComposeDevTemplate(port: number): string {
   return `version: '3.8'
 
@@ -275,11 +273,19 @@ services:
       - .:/app
       - /app/node_modules
       - /app/.next
+      - pnpm-store:/root/.pnpm-store
+      - npm-cache:/root/.npm
     environment:
       - NODE_ENV=development
       - PORT=${port}
+      - CHOKIDAR_USEPOLLING=1
+      - WATCHPACK_POLLING=true
     stdin_open: true
     tty: true
+
+volumes:
+  pnpm-store:
+  npm-cache:
 `;
 }
 
@@ -290,14 +296,16 @@ export function registerAddDocker(program: Command) {
     .option("--node <version>", "Node.js version", "22")
     .option("--port <number>", "Port number", "3000")
     .option("--image <name>", "Docker image name", "myapp")
-    .option("--compose", "Also generate docker-compose.dev.yml")
+    // Commander creates a boolean option `compose` that defaults to true.
+    // Passing --no-compose will set opts.compose === false.
+    .option("--no-compose", "Skip generating docker-compose.dev.yml (enabled by default)")
     .option("--force", "Overwrite existing files")
     .action(
       async (opts: {
         node: string;
         port: string;
         image: string;
-        compose?: boolean;
+        compose?: boolean; // true by default, false if --no-compose passed
         force?: boolean;
       }) => {
         try {
@@ -343,12 +351,15 @@ export function registerAddDocker(program: Command) {
             createdFiles.push("Dockerfile.dev");
           }
 
-          // Generate docker-compose.dev.yml (optional)
-          if (opts.compose) {
+          // Generate docker-compose.dev.yml (enabled by default unless --no-compose)
+          const composeEnabled = opts.compose !== false;
+          if (composeEnabled) {
             const composePath = path.join(process.cwd(), "docker-compose.dev.yml");
             if (await writeIfAbsent(composePath, dockerComposeDevTemplate(port), !!opts.force)) {
               createdFiles.push("docker-compose.dev.yml");
             }
+          } else {
+            console.log(`- Docker Compose: skipped (--no-compose)`);
           }
 
           // Update package.json with Docker scripts
@@ -364,9 +375,7 @@ export function registerAddDocker(program: Command) {
           console.log(`\nDocker configuration generated with:`);
           console.log(`- Node.js version: ${nodeVersion}`);
           console.log(`- Port: ${port}`);
-          if (opts.compose) {
-            console.log(`- Docker Compose: enabled`);
-          }
+          console.log(`- Docker Compose: ${composeEnabled ? "enabled" : "skipped"}`);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error(`add:docker failed: ${msg}`);
