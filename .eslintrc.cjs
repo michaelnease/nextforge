@@ -7,7 +7,7 @@ module.exports = {
   parserOptions: {
     ecmaVersion: "latest",
     sourceType: "module",
-    project: "./tsconfig.json",
+    project: "./tsconfig.eslint.json",
   },
   plugins: ["@typescript-eslint", "import", "prettier"],
   extends: [
@@ -21,7 +21,7 @@ module.exports = {
     "import/resolver": {
       typescript: {
         alwaysTryTypes: true,
-        project: "./tsconfig.json",
+        project: "./tsconfig.eslint.json",
       },
       node: {
         extensions: [".js", ".ts"],
