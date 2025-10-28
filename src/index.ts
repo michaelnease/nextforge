@@ -1,8 +1,9 @@
 // src/main.ts (or wherever your entry is)
 import { Command } from "commander";
 
+import { registerAddDocker } from "./commands/add/docker.js";
 import { registerAddGroup } from "./commands/add/group.js";
-import { registerAddPage } from "./commands/add/page.js"; // ⬅ add this
+import { registerAddPage } from "./commands/add/page.js";
 import { doctorCommand } from "./commands/doctor.js";
 
 export async function main(): Promise<void> {
@@ -14,6 +15,7 @@ export async function main(): Promise<void> {
   program.addCommand(doctorCommand);
   registerAddGroup(program);
   registerAddPage(program);
+  registerAddDocker(program);
 
   await program.parseAsync(process.argv);
 }

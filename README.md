@@ -343,6 +343,28 @@ npm run build && npm test
 npm run format && npm run lint:fix
 ```
 
+### Git Hooks
+
+This project uses **Husky** to ensure code quality before commits and pushes:
+
+- **Pre-commit hook**: Runs `npm run verify` before each commit
+- **Pre-push hook**: Runs `npm run verify` before pushing to GitHub
+
+The hooks will prevent commits/pushes if:
+
+- ESLint finds any issues
+- Prettier formatting is incorrect
+- TypeScript compilation fails
+- Tests fail
+- CLI smoke tests fail
+
+To bypass hooks (not recommended):
+
+```bash
+git commit --no-verify -m "message"
+git push --no-verify
+```
+
 ### Utility Scripts
 
 ```bash
