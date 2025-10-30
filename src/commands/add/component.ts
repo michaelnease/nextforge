@@ -1,3 +1,5 @@
+// Intentionally unused import kept for possible future synchronous checks
+// import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -5,6 +7,8 @@ import type { Command } from "commander";
 
 import { loadConfig } from "../../utils/loadConfig.js";
 import { mergeConfig } from "../../utils/mergeConfig.js";
+
+const MANIFEST_PATH = ".nextforge/manifest.json";
 
 type Kind = "ui" | "layout" | "section" | "feature";
 
@@ -63,8 +67,6 @@ export default function ${name}({ title, subtitle }: ${props}) {
   return withClientHeader(code, isClient);
 }
 
-// legacy basic layout kept via tplLayoutBasic below
-
 function tplTailwind(name: string, isClient: boolean) {
   const props = pascalProps(name);
   const code = `import React from "react";
@@ -110,6 +112,7 @@ export default function ${name}({ title, subtitle }: ${props}) {
   return withClientHeader(code, isClient);
 }
 
+// "both": Chakra primitives + Tailwind utility classes for teams migrating or mixing frameworks
 function tplChakraTailwind(name: string, isClient: boolean) {
   const props = pascalProps(name);
   const code = `import React from "react";
@@ -173,6 +176,7 @@ export default function ${name}({ children }: ${props}) {
   return withClientHeader(code, isClient);
 }
 
+// "both": Chakra Container with Tailwind layout classes
 function tplLayoutChakraTailwind(name: string, isClient: boolean) {
   const props = pascalProps(name);
   const code = `import React, { type ReactNode } from "react";
@@ -243,6 +247,18 @@ export function registerAddComponent(program: Command) {
 
         const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
         const fw = (opts.framework ?? "").toString().toLowerCase().trim();
+        const validFrameworks = new Set([
+          "",
+          "chakra",
+          "tailwind",
+          "basic",
+          "both",
+          "chakra+tailwind",
+          "tailwind+chakra",
+        ]);
+        if (!validFrameworks.has(fw)) {
+          throw new Error(`Invalid --framework "${fw}". Use chakra | tailwind | basic | both.`);
+        }
         const fwOverride =
           fw === "chakra"
             ? { useChakra: true, useTailwind: false }
@@ -317,6 +333,60 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
 
         const rel = path.relative(process.cwd(), dir) || dir;
         console.log(`Created component at ${rel}`);
+
+        // === Barrel update ===
+        try {
+          const barrelDir = path.join(baseDir, "components", kind);
+          const barrelPath = path.join(barrelDir, "index.ts");
+
+          let barrelContent = "";
+          try {
+            barrelContent = await fs.readFile(barrelPath, "utf8");
+          } catch {
+            // no existing barrel
+          }
+
+          const exportLine = `export * from "./${leaf}";`;
+          if (!barrelContent.includes(exportLine) || Boolean(opts.force)) {
+            const lines = barrelContent.split(/\r?\n/).filter(Boolean);
+            if (!lines.includes(exportLine)) lines.push(exportLine);
+            lines.sort((a, b) => a.localeCompare(b));
+            await fs.mkdir(barrelDir, { recursive: true });
+            await fs.writeFile(barrelPath, lines.join("\n") + "\n", "utf8");
+            console.log(`Updated barrel: components/${kind}/index.ts`);
+          }
+        } catch (err) {
+          console.warn("Barrel update skipped:", err instanceof Error ? err.message : String(err));
+        }
+
+        // === Manifest update ===
+        try {
+          const manifestPath = path.resolve(process.cwd(), MANIFEST_PATH);
+          let manifest: { components: Record<string, string[]> } = { components: {} };
+          try {
+            const raw = await fs.readFile(manifestPath, "utf8");
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              manifest = { components: { ...(parsed.components || {}) } };
+            }
+          } catch {
+            // will create fresh manifest
+          }
+
+          const section = manifest.components;
+          const list = (section[kind] ||= []);
+          if (!list.includes(leaf)) list.push(leaf);
+          list.sort((a, b) => a.localeCompare(b));
+
+          await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+          await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+          console.log("Updated .nextforge/manifest.json");
+        } catch (err) {
+          console.warn(
+            "Manifest update skipped:",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`add:component failed: ${msg}`);
