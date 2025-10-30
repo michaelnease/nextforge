@@ -179,25 +179,29 @@ export function registerAddGroup(program: Command) {
             .filter((s) => s !== "." && s !== "..");
         };
 
-        const DYNAMIC = /^\[\.{0,3}[a-zA-Z0-9_-]+\]$/; // [id], [...rest]
+        const DYNAMIC = /^\[\.{0,3}[a-zA-Z0-9_-]+\]$/; // [id], [...rest], [[...maybe]] (outer [[...]] not yet)
         const SEGMENT = /^[a-z0-9-]+$/i;
-        const isValidSegment = (seg: string) => SEGMENT.test(seg) || DYNAMIC.test(seg);
+        const isValidPart = (part: string) => SEGMENT.test(part) || DYNAMIC.test(part);
 
-        const segments = Array.from(new Set(parsePages(opts.pages)));
+        const rawSegments = Array.from(new Set(parsePages(opts.pages)));
 
-        for (const seg of segments) {
-          if (!isValidSegment(seg)) {
+        for (const raw of rawSegments) {
+          const parts = raw.split("/").filter(Boolean);
+          const invalid = parts.filter((p) => !isValidPart(p));
+          if (invalid.length) {
             throw new Error(
-              `Invalid page segment "${seg}". Use names like "signin" or "[id]" or "[...rest]".`
+              `Invalid page segment "${raw}". Bad parts: ${invalid.join(", ")}. ` +
+                `Use names like "signin", "[id]", "[...rest]", or nested "settings/notifications".`
             );
           }
-          const leafDir = path.join(groupDir, seg);
+          const leafDir = path.join(groupDir, ...parts);
           await ensureDir(leafDir);
+          const last = parts[parts.length - 1] || "page";
           const contents = config.useChakra
-            ? pageTemplateChakra(seg)
+            ? pageTemplateChakra(last)
             : config.useTailwind
-              ? pageTemplateTailwind(seg)
-              : pageTemplateBasic(seg);
+              ? pageTemplateTailwind(last)
+              : pageTemplateBasic(last);
           await writeIfAbsent(path.join(leafDir, "page.tsx"), contents, opts.force);
         }
 
