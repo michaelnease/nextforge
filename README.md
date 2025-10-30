@@ -85,6 +85,9 @@ nextforge add:page <route> [options]
 
 # Scaffold a NextForge config
 nextforge init
+
+# Create components
+nextforge add:component <name> --kind <ui|layout|section|feature> [options]
 ```
 
 ### Page and API Route Generation
@@ -131,6 +134,33 @@ export default {
   pagesDir: "app",
 };
 ```
+
+### Component Generation
+
+Scaffold reusable components under `<app>/components/<kind>/<Name>`.
+
+```bash
+# Basic UI component
+nextforge add:component Button --kind ui --app app
+
+# Layout component (accepts children)
+nextforge add:component Shell --kind layout --app app
+
+# Nested sections
+nextforge add:component marketing/Hero --kind section --app app
+
+# Feature component with extras
+nextforge add:component Auth --kind feature --with-test --with-story --client --app app
+```
+
+#### Component Options
+
+- `--kind <kind>` - One of: ui, layout, section, feature (required)
+- `--app <dir>` - App directory (default: `app`)
+- `--client` - Add "use client" header
+- `--with-test` - Create a basic Vitest test file
+- `--with-story` - Create a Storybook story file
+- `--force` - Overwrite existing files
 
 Notes:
 
@@ -468,6 +498,7 @@ src/
 ├── commands/
 │   ├── doctor.ts              # Doctor command implementation
 │   └── add/
+│       ├── component.ts       # Component generator
 │       ├── group.ts           # Route group generator
 │       └── page.ts            # Page and API route generator
 ├── build-smoke.test.ts        # Build verification test

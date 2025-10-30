@@ -3,6 +3,9 @@ import path from "node:path";
 
 import type { Command } from "commander";
 
+import { loadConfig } from "../../utils/loadConfig.js";
+import { mergeConfig } from "../../utils/mergeConfig.js";
+
 type Kind = "ui" | "layout" | "section" | "feature";
 
 function pascalCase(s: string) {
@@ -53,22 +56,120 @@ export default function ${name}({ title }: ${name}Props) {
 `;
 }
 
-function tplLayout(name: string, isClient: boolean) {
+// legacy basic layout kept via tplLayoutBasic below
+
+function tplTailwind(name: string, isClient: boolean) {
+  const hdr = headerClient(isClient);
+  return `${hdr}import React from "react";
+
+export interface ${name}Props { title?: string }
+export default function ${name}({ title }: ${name}Props) {
+  return (
+    <section className="p-6">
+      <h2 className="text-xl font-semibold">${name}</h2>
+      {title ? <p className="mt-2 text-gray-600">{title}</p> : null}
+    </section>
+  );
+}
+`;
+}
+
+function tplChakra(name: string, isClient: boolean) {
+  const hdr = headerClient(isClient);
+  return `${hdr}import React from "react";
+import { Box, Heading, Text } from "@chakra-ui/react";
+
+export interface ${name}Props { title?: string }
+export default function ${name}({ title }: ${name}Props) {
+  return (
+    <Box py={6}>
+      <Heading size="md">${name}</Heading>
+      {title ? <Text mt={2}>{title}</Text> : null}
+    </Box>
+  );
+}
+`;
+}
+
+function tplChakraTailwind(name: string, isClient: boolean) {
+  const hdr = headerClient(isClient);
+  return `${hdr}import React from "react";
+import { Box, Heading, Text } from "@chakra-ui/react";
+
+export interface ${name}Props { title?: string }
+export default function ${name}({ title }: ${name}Props) {
+  return (
+    <Box py={6} className="p-6">
+      <Heading size="md" className="text-xl font-semibold">${name}</Heading>
+      {title ? <Text mt={2} className="text-gray-600">{title}</Text> : null}
+    </Box>
+  );
+}
+`;
+}
+
+function tplLayoutBasic(name: string, isClient: boolean) {
   const hdr = headerClient(isClient);
   return `${hdr}import React, { type ReactNode } from "react";
 
-export interface ${name}Props {
-  children: ReactNode;
-}
-
+export interface ${name}Props { children: React.ReactNode }
 export default function ${name}({ children }: ${name}Props) {
   return <div>{children}</div>;
 }
 `;
 }
 
-function createTemplate(kind: Kind, name: string, isClient: boolean) {
-  return kind === "layout" ? tplLayout(name, isClient) : tplBasic(name, isClient);
+function tplLayoutTailwind(name: string, isClient: boolean) {
+  const hdr = headerClient(isClient);
+  return `${hdr}import React, { type ReactNode } from "react";
+
+export interface ${name}Props { children: ReactNode }
+export default function ${name}({ children }: ${name}Props) {
+  return <div className="container mx-auto px-4 py-6">{children}</div>;
+}
+`;
+}
+
+function tplLayoutChakra(name: string, isClient: boolean) {
+  const hdr = headerClient(isClient);
+  return `${hdr}import React, { type ReactNode } from "react";
+import { Container } from "@chakra-ui/react";
+
+export interface ${name}Props { children: ReactNode }
+export default function ${name}({ children }: ${name}Props) {
+  return <Container maxW="6xl" py={6}>{children}</Container>;
+}
+`;
+}
+
+function tplLayoutChakraTailwind(name: string, isClient: boolean) {
+  const hdr = headerClient(isClient);
+  return `${hdr}import React, { type ReactNode } from "react";
+import { Container } from "@chakra-ui/react";
+
+export interface ${name}Props { children: ReactNode }
+export default function ${name}({ children }: ${name}Props) {
+  return <Container maxW="6xl" py={6} className="container mx-auto px-4">{children}</Container>;
+}
+`;
+}
+
+function chooseTemplate(
+  kind: Kind,
+  name: string,
+  cfg: { useChakra?: boolean; useTailwind?: boolean },
+  isClient: boolean
+) {
+  if (kind === "layout") {
+    if (cfg.useChakra && cfg.useTailwind) return tplLayoutChakraTailwind(name, isClient);
+    if (cfg.useChakra) return tplLayoutChakra(name, isClient);
+    if (cfg.useTailwind) return tplLayoutTailwind(name, isClient);
+    return tplLayoutBasic(name, isClient);
+  }
+  if (cfg.useChakra && cfg.useTailwind) return tplChakraTailwind(name, isClient);
+  if (cfg.useChakra) return tplChakra(name, isClient);
+  if (cfg.useTailwind) return tplTailwind(name, isClient);
+  return tplBasic(name, isClient);
 }
 
 function assertKind(k: string): asserts k is Kind {
@@ -84,6 +185,7 @@ export function registerAddComponent(program: Command) {
     .argument("<name>", "Component name, e.g. Button or marketing/Hero")
     .requiredOption("--kind <kind>", "ui | layout | section | feature")
     .option("--app <dir>", "App directory (default: app)", "app")
+    .option("--framework <name>", "Override template: chakra | tailwind | basic | both")
     .option("--client", "Mark as a client component", false)
     .option("--with-test", "Create a basic test file", false)
     .option("--with-story", "Create a Storybook story file", false)
@@ -106,7 +208,29 @@ export function registerAddComponent(program: Command) {
         const leaf = pascalCase(parts.pop()!);
         const subdirs = parts.map(pascalCase);
 
-        const baseDir = path.resolve(process.cwd(), opts.app);
+        const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
+        const fw = (opts.framework ?? "").toString().toLowerCase().trim();
+        const fwOverride =
+          fw === "chakra"
+            ? { useChakra: true, useTailwind: false }
+            : fw === "tailwind"
+              ? { useChakra: false, useTailwind: true }
+              : fw === "basic"
+                ? { useChakra: false, useTailwind: false }
+                : fw === "both" || fw === "chakra+tailwind" || fw === "tailwind+chakra"
+                  ? { useChakra: true, useTailwind: true }
+                  : {};
+        const flagsCfg = {
+          pagesDir: opts.app,
+          ...fwOverride,
+        } as Partial<{ pagesDir: string; useChakra: boolean; useTailwind: boolean }>;
+        const config = mergeConfig({
+          fileConfig: fileCfg,
+          env: process.env,
+          flags: flagsCfg as Partial<Record<string, unknown>>,
+        });
+
+        const baseDir = path.resolve(process.cwd(), config.pagesDir);
         const dir = path.join(baseDir, "components", kind, ...subdirs, leaf);
 
         await ensureDir(dir);
@@ -114,7 +238,12 @@ export function registerAddComponent(program: Command) {
         const componentPath = path.join(dir, `${leaf}.tsx`);
         const indexPath = path.join(dir, "index.ts");
 
-        const componentCode = createTemplate(kind as Kind, leaf, Boolean(opts.client));
+        const componentCode = chooseTemplate(
+          kind as Kind,
+          leaf,
+          { useChakra: config.useChakra, useTailwind: config.useTailwind },
+          Boolean(opts.client)
+        );
         await writeFileSafe(componentPath, componentCode, Boolean(opts.force));
 
         const indexCode = `export { default } from "./${leaf}";\nexport * from "./${leaf}";\n`;
