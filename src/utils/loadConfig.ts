@@ -1,89 +1,81 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
-import vm from "node:vm";
+import { pathToFileURL } from "node:url";
 
-export type NextForgeConfig = {
-  useTailwind?: boolean;
-  useChakra?: boolean;
-  defaultLayout?: string;
-  pagesDir?: string;
-};
+import { configSchema, type NextForgeConfig } from "./configSchema.js";
 
-function evaluateObjectLiteral(source: string): unknown {
-  const trimmed = source.trim().replace(/;\s*$/, "");
-  const wrapped = `(${trimmed})`;
-  return vm.runInNewContext(wrapped, {}, { timeout: 50 });
+const requireCjs = createRequire(import.meta.url);
+
+function getModuleDefault(mod: unknown): unknown {
+  if (mod && typeof mod === "object" && "default" in (mod as Record<string, unknown>)) {
+    return (mod as { default: unknown }).default;
+  }
+  return mod;
 }
 
-function tryLoadFromText(filePath: string): NextForgeConfig | null {
-  try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    // Handle ESM default export: export default {...}
-    const esmMatch = raw.match(/export\s+default\s+([\s\S]*)/);
-    if (esmMatch && esmMatch[1]) {
-      const obj = evaluateObjectLiteral(esmMatch[1]);
-      if (obj && typeof obj === "object") return obj as NextForgeConfig;
-    }
-
-    // Handle CommonJS: module.exports = {...}
-    const cjsMatch = raw.match(/module\.exports\s*=\s*([\s\S]*)/);
-    if (cjsMatch && cjsMatch[1]) {
-      const obj = evaluateObjectLiteral(cjsMatch[1]);
-      if (obj && typeof obj === "object") return obj as NextForgeConfig;
-    }
-
-    // Handle CommonJS named default: exports.default = {...}
-    const cjsDefaultMatch = raw.match(/exports\.default\s*=\s*([\s\S]*)/);
-    if (cjsDefaultMatch && cjsDefaultMatch[1]) {
-      const obj = evaluateObjectLiteral(cjsDefaultMatch[1]);
-      if (obj && typeof obj === "object") return obj as NextForgeConfig;
-    }
-  } catch {
-    // swallow and return null
+async function tryLoadModule(file: string): Promise<unknown | undefined> {
+  if (!fs.existsSync(file)) return undefined;
+  if (file.endsWith(".json")) {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
   }
-  return null;
+  if (file.endsWith(".js") || file.endsWith(".mjs")) {
+    const mod: unknown = await import(pathToFileURL(file).href);
+    return getModuleDefault(mod);
+  }
+  if (file.endsWith(".cjs")) {
+    const mod: unknown = requireCjs(file);
+    return getModuleDefault(mod);
+  }
+  if (file.endsWith(".ts")) {
+    try {
+      const mod: unknown = await import(pathToFileURL(file).href);
+      return getModuleDefault(mod);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
-export function loadConfig(): NextForgeConfig {
-  const cwd = process.cwd();
-  const configPaths = [
-    path.join(cwd, "nextforge.config.ts"),
-    path.join(cwd, "nextforge.config.js"),
-    path.join(cwd, "nextforge.config.mjs"),
-    path.join(cwd, "nextforge.config.cjs"),
-    path.join(cwd, "nextforge.config.json"),
-  ];
+export async function loadConfig(opts?: {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  verbose?: boolean;
+}): Promise<NextForgeConfig> {
+  const cwd = opts?.cwd ?? process.cwd();
+  const env = opts?.env ?? process.env;
+  const candidates = [
+    "nextforge.config.ts",
+    "nextforge.config.mjs",
+    "nextforge.config.js",
+    "nextforge.config.cjs",
+    "nextforge.config.json",
+  ].map((f) => path.join(cwd, f));
 
-  for (const configPath of configPaths) {
-    if (!fs.existsSync(configPath)) continue;
-
-    // JSON can be parsed directly
-    if (configPath.endsWith(".json")) {
-      try {
-        const json = fs.readFileSync(configPath, "utf8");
-        const obj = JSON.parse(json);
-        console.log("🧩 Loaded NextForge config:", obj);
-        return obj as NextForgeConfig;
-      } catch {
-        // fall through to defaults
-        break;
-      }
-    }
-
-    // Try to load JS/TS by simple textual extraction of the exported object
-    const fromText = tryLoadFromText(configPath);
-    if (fromText) {
-      console.log("🧩 Loaded NextForge config:", fromText);
-      return fromText;
-    }
+  let raw: unknown | undefined;
+  for (const file of candidates) {
+    raw = await tryLoadModule(file);
+    if (raw != null) break;
   }
 
-  const defaults: NextForgeConfig = {
-    useTailwind: true,
-    useChakra: false,
-    defaultLayout: "main",
-    pagesDir: "app",
-  };
-  console.log("🧩 Loaded NextForge config:", defaults);
-  return defaults;
+  const envOverrides: Partial<NextForgeConfig> = {};
+  if (env.NEXTFORGE_USE_TAILWIND != null) {
+    envOverrides.useTailwind = env.NEXTFORGE_USE_TAILWIND === "true";
+  }
+  if (env.NEXTFORGE_USE_CHAKRA != null) {
+    envOverrides.useChakra = env.NEXTFORGE_USE_CHAKRA === "true";
+  }
+  if (env.NEXTFORGE_DEFAULT_LAYOUT) envOverrides.defaultLayout = env.NEXTFORGE_DEFAULT_LAYOUT;
+  if (env.NEXTFORGE_PAGES_DIR) envOverrides.pagesDir = env.NEXTFORGE_PAGES_DIR;
+
+  const merged = { ...(raw as object | undefined), ...envOverrides };
+  const parsed = configSchema.safeParse(merged ?? {});
+  const finalCfg = parsed.success ? parsed.data : configSchema.parse({});
+
+  if (opts?.verbose || env.NEXTFORGE_DEBUG === "1") {
+    // eslint-disable-next-line no-console
+    console.log("Loaded NextForge config", finalCfg);
+  }
+  return finalCfg;
 }

@@ -147,7 +147,7 @@ export function registerAddGroup(program: Command) {
     )
     .action(async (name, opts) => {
       try {
-        const config = loadConfig();
+        const config = await loadConfig();
         const group = normalizeGroupName(name);
         const appDir = path.resolve(process.cwd(), opts.app);
         const groupDir = path.join(appDir, group);
