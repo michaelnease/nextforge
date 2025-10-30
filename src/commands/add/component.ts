@@ -112,7 +112,7 @@ function tplLayoutBasic(name: string, isClient: boolean) {
   const hdr = headerClient(isClient);
   return `${hdr}import React, { type ReactNode } from "react";
 
-export interface ${name}Props { children: React.ReactNode }
+export interface ${name}Props { children: ReactNode }
 export default function ${name}({ children }: ${name}Props) {
   return <div>{children}</div>;
 }
