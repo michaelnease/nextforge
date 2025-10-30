@@ -57,9 +57,9 @@ function layoutTemplate() {
 export default function GroupLayout({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
-// [nextforge.templates:layout:end]
 `;
 }
+// [nextforge.templates:layout:end]
 
 // [nextforge.templates:page.tailwind:start]
 function pageTemplateTailwind(title: string) {
@@ -79,9 +79,9 @@ export default async function Page() {
     </section>
   );
 }
-// [nextforge.templates:page.tailwind:end]
 `;
 }
+// [nextforge.templates:page.tailwind:end]
 
 // [nextforge.templates:page.basic:start]
 function pageTemplateBasic(title: string) {
@@ -100,9 +100,9 @@ export default async function Page() {
     </section>
   );
 }
-// [nextforge.templates:page.basic:end]
 `;
 }
+// [nextforge.templates:page.basic:end]
 
 // [nextforge.templates:page.chakra:start]
 function pageTemplateChakra(title: string) {
@@ -122,9 +122,9 @@ export default async function Page() {
     </Container>
   );
 }
-// [nextforge.templates:page.chakra:end]
 `;
 }
+// [nextforge.templates:page.chakra:end]
 
 function readmeTemplate(groupLabel: string) {
   return `# ${groupLabel} route group

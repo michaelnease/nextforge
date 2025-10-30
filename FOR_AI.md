@@ -11,3 +11,4 @@
   - Chakra page: `[nextforge.templates:page.chakra]`
 - Config is loaded with `loadConfig` and merged via `mergeConfig`.
 - Precedence: CLI flags → env → config file → defaults.
+- Do not edit outside anchor blocks unless explicitly instructed.
