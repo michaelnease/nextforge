@@ -1,6 +1,7 @@
 // src/main.ts (or wherever your entry is)
 import { Command } from "commander";
 
+import { registerAddComponent } from "./commands/add/component.js";
 import { registerAddDocker } from "./commands/add/docker.js";
 import { registerAddGroup } from "./commands/add/group.js";
 import { registerAddPage } from "./commands/add/page.js";
@@ -20,6 +21,7 @@ export async function main(): Promise<void> {
   registerAddPage(program);
   registerAddDocker(program);
   registerInit(program);
+  registerAddComponent(program);
   // [nextforge.register:commands:end]
 
   await program.parseAsync(process.argv);
