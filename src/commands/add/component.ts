@@ -69,6 +69,12 @@ async function appendExportIfMissing(kindIndexPath: string, relPathFromKind: str
   }
 }
 
+async function sortBarrel(kindIndexPath: string) {
+  const cur = await readIfExists(kindIndexPath);
+  const lines = cur.split("\n").filter(Boolean).sort();
+  await fs.writeFile(kindIndexPath, lines.join("\n") + "\n", "utf8");
+}
+
 // ---- Templates ----
 function tplBasic(name: string, isClient: boolean) {
   const props = pascalProps(name);
@@ -361,10 +367,18 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
 
         // === Barrel update (per-kind re-exports) ===
         try {
-          const relFolder = subdirs.length ? [...subdirs, leaf].join("/") : leaf;
-          const kindIndexPath = path.join(baseDir, "components", kind, "index.ts");
-          await appendExportIfMissing(kindIndexPath, relFolder, leaf);
-          console.log(`Updated barrel: components/${kind}/index.ts`);
+          const barrelEnabled = (config as Record<string, unknown>).barrelExports !== false;
+          if (barrelEnabled) {
+            const relFolder = subdirs.length ? [...subdirs, leaf].join("/") : leaf;
+            const kindIndexPath = path.join(baseDir, "components", kind, "index.ts");
+            const before = await readIfExists(kindIndexPath);
+            await appendExportIfMissing(kindIndexPath, relFolder, leaf);
+            await sortBarrel(kindIndexPath);
+            const wasCreated = before === "";
+            console.log(
+              `${wasCreated ? "Created" : "Updated"} barrel: components/${kind}/index.ts`
+            );
+          }
         } catch (err) {
           console.warn("Barrel update skipped:", err instanceof Error ? err.message : String(err));
         }
