@@ -5,6 +5,7 @@ import { registerAddDocker } from "./commands/add/docker.js";
 import { registerAddGroup } from "./commands/add/group.js";
 import { registerAddPage } from "./commands/add/page.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { registerInit } from "./commands/init.js";
 
 export async function main(): Promise<void> {
   const program = new Command()
@@ -17,6 +18,7 @@ export async function main(): Promise<void> {
   registerAddGroup(program);
   registerAddPage(program);
   registerAddDocker(program);
+  registerInit(program);
 
   await program.parseAsync(process.argv);
 }
