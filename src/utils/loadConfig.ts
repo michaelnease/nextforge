@@ -31,8 +31,16 @@ async function tryLoadModule(file: string): Promise<unknown | undefined> {
     try {
       const mod: unknown = await import(pathToFileURL(file).href);
       return getModuleDefault(mod);
-    } catch {
-      return undefined;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        [
+          `Failed to load ${path.basename(file)}.`,
+          `If you want a TypeScript config, run with a TS loader (e.g. "tsx nextforge ..."),`,
+          `or rename to nextforge.config.mjs/js/json.`,
+          `Underlying error: ${message}`,
+        ].join(" ")
+      );
     }
   }
   return undefined;

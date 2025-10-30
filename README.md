@@ -133,6 +133,18 @@ Notes:
 
 - If no config file is found, sensible defaults are used.
 - Works in both ESM and CommonJS projects.
+- TS config requires running with a loader (e.g., `tsx`). Otherwise, use `.mjs`/`.js`/`.json`.
+
+Precedence:
+
+- CLI flags → Environment variables → Config file → Defaults
+
+Environment variables:
+
+- `NEXTFORGE_USE_TAILWIND` (`true|false`)
+- `NEXTFORGE_USE_CHAKRA` (`true|false`)
+- `NEXTFORGE_DEFAULT_LAYOUT` (string)
+- `NEXTFORGE_PAGES_DIR` (string)
 
 #### Page Generation Options
 

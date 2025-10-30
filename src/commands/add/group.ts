@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Command } from "commander";
 
 import { loadConfig } from "../../utils/loadConfig.js";
+import { mergeConfig } from "../../utils/mergeConfig.js";
 
 /**
  * Normalize a route group name.
@@ -15,6 +16,9 @@ function normalizeGroupName(input: string) {
   const name = trimmed.startsWith("(") && trimmed.endsWith(")") ? trimmed.slice(1, -1) : trimmed;
   if (!/^[a-z0-9-]+$/i.test(name)) {
     throw new Error(`Invalid group name "${name}". Use letters, numbers, and dashes only.`);
+  }
+  if (name.toLowerCase() === "api") {
+    throw new Error('Group name "api" is reserved. Pick another.');
   }
   return `(${name})`;
 }
@@ -147,9 +151,11 @@ export function registerAddGroup(program: Command) {
     )
     .action(async (name, opts) => {
       try {
-        const config = await loadConfig();
+        const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
+        const flagsCfg = { pagesDir: opts.app };
+        const config = mergeConfig({ fileConfig: fileCfg, env: process.env, flags: flagsCfg });
         const group = normalizeGroupName(name);
-        const appDir = path.resolve(process.cwd(), opts.app);
+        const appDir = path.resolve(process.cwd(), config.pagesDir);
         const groupDir = path.join(appDir, group);
 
         await assertDirExists(appDir);
@@ -164,33 +170,35 @@ export function registerAddGroup(program: Command) {
           await writeIfAbsent(path.join(groupDir, "README.md"), readmeTemplate(group), opts.force);
         }
 
-        if (opts.pages) {
-          const segments = Array.from(
-            new Set(
-              String(opts.pages)
-                .split(",")
-                .map((s: string) => s.trim().replace(/^\/+|\/+$/g, "")) // trim leading/trailing slashes
-                .filter(Boolean)
-                .filter((s) => s !== "." && s !== "..")
-            )
-          );
+        const parsePages = (input?: string): string[] => {
+          if (!input) return [];
+          return String(input)
+            .split(",")
+            .map((s) => s.trim().replace(/^\/+|\/+$/g, ""))
+            .filter(Boolean)
+            .filter((s) => s !== "." && s !== "..");
+        };
 
-          for (const seg of segments) {
-            // Allow letters, numbers, dashes, brackets, dots (for [...slug]), and slashes for nested segments
-            if (!/^[a-z0-9[\]./-]+$/i.test(seg)) {
-              throw new Error(
-                `Invalid page segment "${seg}". Use letters, numbers, dashes, or dynamic patterns like [slug] or [...slug].`
-              );
-            }
-            const leafDir = path.join(groupDir, seg);
-            await ensureDir(leafDir);
-            const contents = config.useChakra
-              ? pageTemplateChakra(seg)
-              : config.useTailwind
-                ? pageTemplateTailwind(seg)
-                : pageTemplateBasic(seg);
-            await writeIfAbsent(path.join(leafDir, "page.tsx"), contents, opts.force);
+        const DYNAMIC = /^\[\.{0,3}[a-zA-Z0-9_-]+\]$/; // [id], [...rest]
+        const SEGMENT = /^[a-z0-9-]+$/i;
+        const isValidSegment = (seg: string) => SEGMENT.test(seg) || DYNAMIC.test(seg);
+
+        const segments = Array.from(new Set(parsePages(opts.pages)));
+
+        for (const seg of segments) {
+          if (!isValidSegment(seg)) {
+            throw new Error(
+              `Invalid page segment "${seg}". Use names like "signin" or "[id]" or "[...rest]".`
+            );
           }
+          const leafDir = path.join(groupDir, seg);
+          await ensureDir(leafDir);
+          const contents = config.useChakra
+            ? pageTemplateChakra(seg)
+            : config.useTailwind
+              ? pageTemplateTailwind(seg)
+              : pageTemplateBasic(seg);
+          await writeIfAbsent(path.join(leafDir, "page.tsx"), contents, opts.force);
         }
 
         const rel = path.relative(process.cwd(), groupDir) || groupDir;
