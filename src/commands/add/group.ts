@@ -3,6 +3,8 @@ import path from "node:path";
 
 import type { Command } from "commander";
 
+import { loadConfig } from "../../utils/loadConfig.js";
+
 /**
  * Normalize a route group name.
  * Accepts "auth" or "(auth)" and returns "(auth)".
@@ -53,7 +55,7 @@ export default function GroupLayout({ children }: { children: ReactNode }) {
 `;
 }
 
-function pageTemplate(title: string) {
+function pageTemplateTailwind(title: string) {
   // Pretty title for seeded pages: strip brackets, title-case segments, join with slash
   const pretty = title
     .replace(/[[\].]/g, "")
@@ -68,6 +70,45 @@ export default async function Page() {
     <section className="p-8">
       <h1 className="text-2xl font-semibold">${pretty}</h1>
     </section>
+  );
+}
+`;
+}
+
+function pageTemplateBasic(title: string) {
+  const pretty = title
+    .replace(/[[\].]/g, "")
+    .split("/")
+    .map((s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s))
+    .join(" / ");
+
+  return `import React from "react";
+
+export default async function Page() {
+  return (
+    <section>
+      <h1>${pretty}</h1>
+    </section>
+  );
+}
+`;
+}
+
+function pageTemplateChakra(title: string) {
+  const pretty = title
+    .replace(/[[\].]/g, "")
+    .split("/")
+    .map((s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s))
+    .join(" / ");
+
+  return `import React from "react";
+import { Container, Heading } from "@chakra-ui/react";
+
+export default async function Page() {
+  return (
+    <Container py={8}>
+      <Heading size="lg">${pretty}</Heading>
+    </Container>
   );
 }
 `;
@@ -106,6 +147,7 @@ export function registerAddGroup(program: Command) {
     )
     .action(async (name, opts) => {
       try {
+        const config = loadConfig();
         const group = normalizeGroupName(name);
         const appDir = path.resolve(process.cwd(), opts.app);
         const groupDir = path.join(appDir, group);
@@ -142,7 +184,12 @@ export function registerAddGroup(program: Command) {
             }
             const leafDir = path.join(groupDir, seg);
             await ensureDir(leafDir);
-            await writeIfAbsent(path.join(leafDir, "page.tsx"), pageTemplate(seg), opts.force);
+            const contents = config.useChakra
+              ? pageTemplateChakra(seg)
+              : config.useTailwind
+                ? pageTemplateTailwind(seg)
+                : pageTemplateBasic(seg);
+            await writeIfAbsent(path.join(leafDir, "page.tsx"), contents, opts.force);
           }
         }
 
