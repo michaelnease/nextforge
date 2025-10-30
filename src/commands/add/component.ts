@@ -44,6 +44,31 @@ function pascalProps(name: string) {
   return `${name}Props`;
 }
 
+async function readIfExists(file: string): Promise<string> {
+  try {
+    return await fs.readFile(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function exportLine(kindPathToLeaf: string, leaf: string) {
+  return (
+    `export { default as ${leaf} } from "./${kindPathToLeaf}/${leaf}";\n` +
+    `export * from "./${kindPathToLeaf}/${leaf}";\n`
+  );
+}
+
+async function appendExportIfMissing(kindIndexPath: string, relPathFromKind: string, leaf: string) {
+  const current = await readIfExists(kindIndexPath);
+  const snippet = exportLine(relPathFromKind, leaf);
+  if (!current.includes(`from "./${relPathFromKind}/${leaf}"`)) {
+    const next = current + snippet;
+    await fs.mkdir(path.dirname(kindIndexPath), { recursive: true });
+    await fs.writeFile(kindIndexPath, next, "utf8");
+  }
+}
+
 // ---- Templates ----
 function tplBasic(name: string, isClient: boolean) {
   const props = pascalProps(name);
@@ -334,27 +359,12 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
         const rel = path.relative(process.cwd(), dir) || dir;
         console.log(`Created component at ${rel}`);
 
-        // === Barrel update ===
+        // === Barrel update (per-kind re-exports) ===
         try {
-          const barrelDir = path.join(baseDir, "components", kind);
-          const barrelPath = path.join(barrelDir, "index.ts");
-
-          let barrelContent = "";
-          try {
-            barrelContent = await fs.readFile(barrelPath, "utf8");
-          } catch {
-            // no existing barrel
-          }
-
-          const exportLine = `export * from "./${leaf}";`;
-          if (!barrelContent.includes(exportLine) || Boolean(opts.force)) {
-            const lines = barrelContent.split(/\r?\n/).filter(Boolean);
-            if (!lines.includes(exportLine)) lines.push(exportLine);
-            lines.sort((a, b) => a.localeCompare(b));
-            await fs.mkdir(barrelDir, { recursive: true });
-            await fs.writeFile(barrelPath, lines.join("\n") + "\n", "utf8");
-            console.log(`Updated barrel: components/${kind}/index.ts`);
-          }
+          const relFolder = subdirs.length ? [...subdirs, leaf].join("/") : leaf;
+          const kindIndexPath = path.join(baseDir, "components", kind, "index.ts");
+          await appendExportIfMissing(kindIndexPath, relFolder, leaf);
+          console.log(`Updated barrel: components/${kind}/index.ts`);
         } catch (err) {
           console.warn("Barrel update skipped:", err instanceof Error ? err.message : String(err));
         }
