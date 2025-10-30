@@ -32,126 +32,159 @@ async function writeFileSafe(file: string, contents: string, force: boolean) {
   await fs.writeFile(file, contents, "utf8");
 }
 
-function headerClient(isClient: boolean) {
-  return isClient ? `"use client"\n\n` : "";
+function withClientHeader(code: string, isClient: boolean) {
+  return isClient ? `"use client"\n\n` + code : code;
 }
 
-// ---- Minimal templates (Phase 2: no Tailwind/Chakra yet) ----
+function pascalProps(name: string) {
+  return `${name}Props`;
+}
+
+// ---- Templates ----
 function tplBasic(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 
-export interface ${name}Props {
+export interface ${props} {
   title?: string;
+  subtitle?: string;
 }
 
-export default function ${name}({ title }: ${name}Props) {
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <section>
       <h2>${name}</h2>
       {title ? <p>{title}</p> : null}
+      {subtitle ? <p>{subtitle}</p> : null}
     </section>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 // legacy basic layout kept via tplLayoutBasic below
 
 function tplTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 
-export interface ${name}Props { title?: string }
-export default function ${name}({ title }: ${name}Props) {
+export interface ${props} {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <section className="p-6">
       <h2 className="text-xl font-semibold">${name}</h2>
       {title ? <p className="mt-2 text-gray-600">{title}</p> : null}
+      {subtitle ? <p className="text-gray-500">{subtitle}</p> : null}
     </section>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplChakra(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 import { Box, Heading, Text } from "@chakra-ui/react";
 
-export interface ${name}Props { title?: string }
-export default function ${name}({ title }: ${name}Props) {
+export interface ${props} {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <Box py={6}>
       <Heading size="md">${name}</Heading>
       {title ? <Text mt={2}>{title}</Text> : null}
+      {subtitle ? <Text color="gray.500">{subtitle}</Text> : null}
     </Box>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplChakraTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 import { Box, Heading, Text } from "@chakra-ui/react";
 
-export interface ${name}Props { title?: string }
-export default function ${name}({ title }: ${name}Props) {
+export interface ${props} {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <Box py={6} className="p-6">
       <Heading size="md" className="text-xl font-semibold">${name}</Heading>
       {title ? <Text mt={2} className="text-gray-600">{title}</Text> : null}
+      {subtitle ? <Text className="text-gray-500">{subtitle}</Text> : null}
     </Box>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplLayoutBasic(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
   return <div>{children}</div>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplLayoutTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
-  return <div className="container mx-auto px-4 py-6">{children}</div>;
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
+  return <div className="container mx-auto px-4">{children}</div>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplLayoutChakra(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 import { Container } from "@chakra-ui/react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
   return <Container maxW="6xl" py={6}>{children}</Container>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplLayoutChakraTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 import { Container } from "@chakra-ui/react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
   return <Container maxW="6xl" py={6} className="container mx-auto px-4">{children}</Container>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function chooseTemplate(
