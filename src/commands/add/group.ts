@@ -50,6 +50,7 @@ async function writeIfAbsent(filePath: string, contents: string, force = false) 
   await fs.writeFile(filePath, contents, "utf8");
 }
 
+// [nextforge.templates:layout:start]
 function layoutTemplate() {
   return `import React, { type ReactNode } from "react";
 
@@ -58,7 +59,9 @@ export default function GroupLayout({ children }: { children: ReactNode }) {
 }
 `;
 }
+// [nextforge.templates:layout:end]
 
+// [nextforge.templates:page.tailwind:start]
 function pageTemplateTailwind(title: string) {
   // Pretty title for seeded pages: strip brackets, title-case segments, join with slash
   const pretty = title
@@ -78,7 +81,9 @@ export default async function Page() {
 }
 `;
 }
+// [nextforge.templates:page.tailwind:end]
 
+// [nextforge.templates:page.basic:start]
 function pageTemplateBasic(title: string) {
   const pretty = title
     .replace(/[[\].]/g, "")
@@ -97,7 +102,9 @@ export default async function Page() {
 }
 `;
 }
+// [nextforge.templates:page.basic:end]
 
+// [nextforge.templates:page.chakra:start]
 function pageTemplateChakra(title: string) {
   const pretty = title
     .replace(/[[\].]/g, "")
@@ -117,6 +124,7 @@ export default async function Page() {
 }
 `;
 }
+// [nextforge.templates:page.chakra:end]
 
 function readmeTemplate(groupLabel: string) {
   return `# ${groupLabel} route group

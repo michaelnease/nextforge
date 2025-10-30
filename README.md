@@ -82,6 +82,9 @@ nextforge add:group <name> [options]
 
 # Create Next.js pages and API routes
 nextforge add:page <route> [options]
+
+# Scaffold a NextForge config
+nextforge init
 ```
 
 ### Page and API Route Generation
