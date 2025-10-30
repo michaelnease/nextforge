@@ -93,7 +93,13 @@ export function registerAddComponent(program: Command) {
         const kind = String(opts.kind);
         assertKind(kind as string);
 
-        const parts = String(name).split("/").filter(Boolean);
+        const parts = String(name)
+          .split("/")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (parts.some((p) => p === "." || p === "..")) {
+          throw new Error("Component path cannot contain '.' or '..'.");
+        }
         const leaf = pascalCase(parts.pop()!);
         const subdirs = parts.map(pascalCase);
 
