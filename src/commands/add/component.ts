@@ -30,7 +30,7 @@ async function writeFileSafe(file: string, contents: string, force: boolean) {
 }
 
 function headerClient(isClient: boolean) {
-  return isClient ? '"use client"\n\n' : "";
+  return isClient ? `"use client"\n\n` : "";
 }
 
 // ---- Minimal templates (Phase 2: no Tailwind/Chakra yet) ----
@@ -99,6 +99,9 @@ export function registerAddComponent(program: Command) {
           .filter(Boolean);
         if (parts.some((p) => p === "." || p === "..")) {
           throw new Error("Component path cannot contain '.' or '..'.");
+        }
+        if (parts.some((p) => /[^a-z0-9-_]/i.test(p))) {
+          throw new Error(`Invalid characters in component path: ${parts.join("/")}`);
         }
         const leaf = pascalCase(parts.pop()!);
         const subdirs = parts.map(pascalCase);
