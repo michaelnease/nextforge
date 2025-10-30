@@ -151,6 +151,11 @@ nextforge add:component marketing/Hero --kind section --app app
 
 # Feature component with extras
 nextforge add:component Auth --kind feature --with-test --with-story --client --app app
+
+# Override framework per-run
+nextforge add:component Hero --kind section --framework chakra --app app
+nextforge add:component Card --kind ui --framework tailwind --app app
+nextforge add:component Shell --kind layout --framework both --app app
 ```
 
 #### Component Options
