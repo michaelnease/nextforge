@@ -113,6 +113,39 @@ nextforge add:page "dashboard/settings" --group admin --async --api --layout --l
 nextforge add:page "about" --force --client --layout
 ```
 
+### Project-wide configuration
+
+NextForge reads an optional `nextforge.config.ts`/`nextforge.config.js`/`nextforge.config.json` from your project root
+to control defaults like Tailwind/Chakra usage, default layout, and pages dir.
+
+Example `nextforge.config.ts`:
+
+```ts
+export default {
+  useTailwind: true,
+  useChakra: false,
+  defaultLayout: "main",
+  pagesDir: "app",
+};
+```
+
+Notes:
+
+- If no config file is found, sensible defaults are used.
+- Works in both ESM and CommonJS projects.
+- TS config requires running with a loader (e.g., `tsx`). Otherwise, use `.mjs`/`.js`/`.json`.
+
+Precedence:
+
+- CLI flags → Environment variables → Config file → Defaults
+
+Environment variables:
+
+- `NEXTFORGE_USE_TAILWIND` (`true|false`)
+- `NEXTFORGE_USE_CHAKRA` (`true|false`)
+- `NEXTFORGE_DEFAULT_LAYOUT` (string)
+- `NEXTFORGE_PAGES_DIR` (string)
+
 #### Page Generation Options
 
 - `-g, --group <name>` - Target route group (e.g. 'auth' or '(auth)')

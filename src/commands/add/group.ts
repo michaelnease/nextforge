@@ -3,6 +3,9 @@ import path from "node:path";
 
 import type { Command } from "commander";
 
+import { loadConfig } from "../../utils/loadConfig.js";
+import { mergeConfig } from "../../utils/mergeConfig.js";
+
 /**
  * Normalize a route group name.
  * Accepts "auth" or "(auth)" and returns "(auth)".
@@ -13,6 +16,9 @@ function normalizeGroupName(input: string) {
   const name = trimmed.startsWith("(") && trimmed.endsWith(")") ? trimmed.slice(1, -1) : trimmed;
   if (!/^[a-z0-9-]+$/i.test(name)) {
     throw new Error(`Invalid group name "${name}". Use letters, numbers, and dashes only.`);
+  }
+  if (name.toLowerCase() === "api") {
+    throw new Error('Group name "api" is reserved. Pick another.');
   }
   return `(${name})`;
 }
@@ -53,7 +59,7 @@ export default function GroupLayout({ children }: { children: ReactNode }) {
 `;
 }
 
-function pageTemplate(title: string) {
+function pageTemplateTailwind(title: string) {
   // Pretty title for seeded pages: strip brackets, title-case segments, join with slash
   const pretty = title
     .replace(/[[\].]/g, "")
@@ -68,6 +74,45 @@ export default async function Page() {
     <section className="p-8">
       <h1 className="text-2xl font-semibold">${pretty}</h1>
     </section>
+  );
+}
+`;
+}
+
+function pageTemplateBasic(title: string) {
+  const pretty = title
+    .replace(/[[\].]/g, "")
+    .split("/")
+    .map((s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s))
+    .join(" / ");
+
+  return `import React from "react";
+
+export default async function Page() {
+  return (
+    <section>
+      <h1>${pretty}</h1>
+    </section>
+  );
+}
+`;
+}
+
+function pageTemplateChakra(title: string) {
+  const pretty = title
+    .replace(/[[\].]/g, "")
+    .split("/")
+    .map((s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s))
+    .join(" / ");
+
+  return `import React from "react";
+import { Container, Heading } from "@chakra-ui/react";
+
+export default async function Page() {
+  return (
+    <Container py={8}>
+      <Heading size="lg">${pretty}</Heading>
+    </Container>
   );
 }
 `;
@@ -106,8 +151,11 @@ export function registerAddGroup(program: Command) {
     )
     .action(async (name, opts) => {
       try {
+        const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
+        const flagsCfg = { pagesDir: opts.app };
+        const config = mergeConfig({ fileConfig: fileCfg, env: process.env, flags: flagsCfg });
         const group = normalizeGroupName(name);
-        const appDir = path.resolve(process.cwd(), opts.app);
+        const appDir = path.resolve(process.cwd(), config.pagesDir);
         const groupDir = path.join(appDir, group);
 
         await assertDirExists(appDir);
@@ -122,28 +170,39 @@ export function registerAddGroup(program: Command) {
           await writeIfAbsent(path.join(groupDir, "README.md"), readmeTemplate(group), opts.force);
         }
 
-        if (opts.pages) {
-          const segments = Array.from(
-            new Set(
-              String(opts.pages)
-                .split(",")
-                .map((s: string) => s.trim().replace(/^\/+|\/+$/g, "")) // trim leading/trailing slashes
-                .filter(Boolean)
-                .filter((s) => s !== "." && s !== "..")
-            )
-          );
+        const parsePages = (input?: string): string[] => {
+          if (!input) return [];
+          return String(input)
+            .split(",")
+            .map((s) => s.trim().replace(/^\/+|\/+$/g, ""))
+            .filter(Boolean)
+            .filter((s) => s !== "." && s !== "..");
+        };
 
-          for (const seg of segments) {
-            // Allow letters, numbers, dashes, brackets, dots (for [...slug]), and slashes for nested segments
-            if (!/^[a-z0-9[\]./-]+$/i.test(seg)) {
-              throw new Error(
-                `Invalid page segment "${seg}". Use letters, numbers, dashes, or dynamic patterns like [slug] or [...slug].`
-              );
-            }
-            const leafDir = path.join(groupDir, seg);
-            await ensureDir(leafDir);
-            await writeIfAbsent(path.join(leafDir, "page.tsx"), pageTemplate(seg), opts.force);
+        const DYNAMIC = /^\[\.{0,3}[a-zA-Z0-9_-]+\]$/; // [id], [...rest], [[...maybe]] (outer [[...]] not yet)
+        const SEGMENT = /^[a-z0-9-]+$/i;
+        const isValidPart = (part: string) => SEGMENT.test(part) || DYNAMIC.test(part);
+
+        const rawSegments = Array.from(new Set(parsePages(opts.pages)));
+
+        for (const raw of rawSegments) {
+          const parts = raw.split("/").filter(Boolean);
+          const invalid = parts.filter((p) => !isValidPart(p));
+          if (invalid.length) {
+            throw new Error(
+              `Invalid page segment "${raw}". Bad parts: ${invalid.join(", ")}. ` +
+                `Use names like "signin", "[id]", "[...rest]", or nested "settings/notifications".`
+            );
           }
+          const leafDir = path.join(groupDir, ...parts);
+          await ensureDir(leafDir);
+          const last = parts[parts.length - 1] || "page";
+          const contents = config.useChakra
+            ? pageTemplateChakra(last)
+            : config.useTailwind
+              ? pageTemplateTailwind(last)
+              : pageTemplateBasic(last);
+          await writeIfAbsent(path.join(leafDir, "page.tsx"), contents, opts.force);
         }
 
         const rel = path.relative(process.cwd(), groupDir) || groupDir;

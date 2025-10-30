@@ -10,7 +10,8 @@ export async function main(): Promise<void> {
   const program = new Command()
     .name("nextforge")
     .description("Forge pages, APIs, and components for modern Next.js apps")
-    .version("0.1.0");
+    .version("0.1.0")
+    .option("--verbose", "Enable verbose logs", false);
 
   program.addCommand(doctorCommand);
   registerAddGroup(program);
