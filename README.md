@@ -139,7 +139,7 @@ export default {
 
 Scaffold reusable components under `<app>/components/<kind>/<Name>`.
 
-```bash
+````bash
 # Basic UI component
 nextforge add:component Button --kind ui --app app
 
@@ -156,7 +156,24 @@ nextforge add:component Auth --kind feature --with-test --with-story --client --
 nextforge add:component Hero --kind section --framework chakra --app app
 nextforge add:component Card --kind ui --framework tailwind --app app
 nextforge add:component Shell --kind layout --framework both --app app
-```
+
+# Client components and typed props
+nextforge add:component Hero --kind section --client --app app
+
+This generates a component with typed props:
+
+```ts
+export interface HeroProps {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function Hero({ title, subtitle }: HeroProps) {
+  // ...
+}
+````
+
+````
 
 #### Component Options
 
@@ -229,7 +246,7 @@ export default function Page() {
     </section>
   );
 }
-```
+````
 
 **Async Server Component:**
 

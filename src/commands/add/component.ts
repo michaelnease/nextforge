@@ -1,3 +1,5 @@
+// Intentionally unused import kept for possible future synchronous checks
+// import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -5,6 +7,8 @@ import type { Command } from "commander";
 
 import { loadConfig } from "../../utils/loadConfig.js";
 import { mergeConfig } from "../../utils/mergeConfig.js";
+
+const MANIFEST_PATH = ".nextforge/manifest.json";
 
 type Kind = "ui" | "layout" | "section" | "feature";
 
@@ -32,126 +36,190 @@ async function writeFileSafe(file: string, contents: string, force: boolean) {
   await fs.writeFile(file, contents, "utf8");
 }
 
-function headerClient(isClient: boolean) {
-  return isClient ? `"use client"\n\n` : "";
+function withClientHeader(code: string, isClient: boolean) {
+  return isClient ? `"use client"\n\n` + code : code;
 }
 
-// ---- Minimal templates (Phase 2: no Tailwind/Chakra yet) ----
+function pascalProps(name: string) {
+  return `${name}Props`;
+}
+
+async function readIfExists(file: string): Promise<string> {
+  try {
+    return await fs.readFile(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function exportLine(kindPathToLeaf: string, leaf: string) {
+  return (
+    `export { default as ${leaf} } from "./${kindPathToLeaf}/${leaf}";\n` +
+    `export * from "./${kindPathToLeaf}/${leaf}";\n`
+  );
+}
+
+async function appendExportIfMissing(kindIndexPath: string, relPathFromKind: string, leaf: string) {
+  const current = await readIfExists(kindIndexPath);
+  const snippet = exportLine(relPathFromKind, leaf);
+  if (!current.includes(`from "./${relPathFromKind}/${leaf}"`)) {
+    const next = current + snippet;
+    await fs.mkdir(path.dirname(kindIndexPath), { recursive: true });
+    await fs.writeFile(kindIndexPath, next, "utf8");
+  }
+}
+
+async function sortBarrel(kindIndexPath: string) {
+  const cur = await readIfExists(kindIndexPath);
+  const lines = cur.split("\n").filter(Boolean).sort();
+  await fs.writeFile(kindIndexPath, lines.join("\n") + "\n", "utf8");
+}
+
+// ---- Templates ----
 function tplBasic(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 
-export interface ${name}Props {
+export interface ${props} {
   title?: string;
+  subtitle?: string;
 }
 
-export default function ${name}({ title }: ${name}Props) {
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <section>
       <h2>${name}</h2>
       {title ? <p>{title}</p> : null}
+      {subtitle ? <p>{subtitle}</p> : null}
     </section>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
-// legacy basic layout kept via tplLayoutBasic below
-
 function tplTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 
-export interface ${name}Props { title?: string }
-export default function ${name}({ title }: ${name}Props) {
+export interface ${props} {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <section className="p-6">
       <h2 className="text-xl font-semibold">${name}</h2>
       {title ? <p className="mt-2 text-gray-600">{title}</p> : null}
+      {subtitle ? <p className="text-gray-500">{subtitle}</p> : null}
     </section>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplChakra(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 import { Box, Heading, Text } from "@chakra-ui/react";
 
-export interface ${name}Props { title?: string }
-export default function ${name}({ title }: ${name}Props) {
+export interface ${props} {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <Box py={6}>
       <Heading size="md">${name}</Heading>
       {title ? <Text mt={2}>{title}</Text> : null}
+      {subtitle ? <Text color="gray.500">{subtitle}</Text> : null}
     </Box>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
+// "both": Chakra primitives + Tailwind utility classes for teams migrating or mixing frameworks
 function tplChakraTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React from "react";
+  const props = pascalProps(name);
+  const code = `import React from "react";
 import { Box, Heading, Text } from "@chakra-ui/react";
 
-export interface ${name}Props { title?: string }
-export default function ${name}({ title }: ${name}Props) {
+export interface ${props} {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function ${name}({ title, subtitle }: ${props}) {
   return (
     <Box py={6} className="p-6">
       <Heading size="md" className="text-xl font-semibold">${name}</Heading>
       {title ? <Text mt={2} className="text-gray-600">{title}</Text> : null}
+      {subtitle ? <Text className="text-gray-500">{subtitle}</Text> : null}
     </Box>
   );
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplLayoutBasic(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
   return <div>{children}</div>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplLayoutTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
-  return <div className="container mx-auto px-4 py-6">{children}</div>;
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
+  return <div className="container mx-auto px-4">{children}</div>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function tplLayoutChakra(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 import { Container } from "@chakra-ui/react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
   return <Container maxW="6xl" py={6}>{children}</Container>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
+// "both": Chakra Container with Tailwind layout classes
 function tplLayoutChakraTailwind(name: string, isClient: boolean) {
-  const hdr = headerClient(isClient);
-  return `${hdr}import React, { type ReactNode } from "react";
+  const props = pascalProps(name);
+  const code = `import React, { type ReactNode } from "react";
 import { Container } from "@chakra-ui/react";
 
-export interface ${name}Props { children: ReactNode }
-export default function ${name}({ children }: ${name}Props) {
+export interface ${props} { children: ReactNode }
+
+export default function ${name}({ children }: ${props}) {
   return <Container maxW="6xl" py={6} className="container mx-auto px-4">{children}</Container>;
 }
 `;
+  return withClientHeader(code, isClient);
 }
 
 function chooseTemplate(
@@ -210,6 +278,18 @@ export function registerAddComponent(program: Command) {
 
         const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
         const fw = (opts.framework ?? "").toString().toLowerCase().trim();
+        const validFrameworks = new Set([
+          "",
+          "chakra",
+          "tailwind",
+          "basic",
+          "both",
+          "chakra+tailwind",
+          "tailwind+chakra",
+        ]);
+        if (!validFrameworks.has(fw)) {
+          throw new Error(`Invalid --framework "${fw}". Use chakra | tailwind | basic | both.`);
+        }
         const fwOverride =
           fw === "chakra"
             ? { useChakra: true, useTailwind: false }
@@ -284,6 +364,53 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
 
         const rel = path.relative(process.cwd(), dir) || dir;
         console.log(`Created component at ${rel}`);
+
+        // === Barrel update (per-kind re-exports) ===
+        try {
+          const barrelEnabled = (config as Record<string, unknown>).barrelExports !== false;
+          if (barrelEnabled) {
+            const relFolder = subdirs.length ? [...subdirs, leaf].join("/") : leaf;
+            const kindIndexPath = path.join(baseDir, "components", kind, "index.ts");
+            const before = await readIfExists(kindIndexPath);
+            await appendExportIfMissing(kindIndexPath, relFolder, leaf);
+            await sortBarrel(kindIndexPath);
+            const wasCreated = before === "";
+            console.log(
+              `${wasCreated ? "Created" : "Updated"} barrel: components/${kind}/index.ts`
+            );
+          }
+        } catch (err) {
+          console.warn("Barrel update skipped:", err instanceof Error ? err.message : String(err));
+        }
+
+        // === Manifest update ===
+        try {
+          const manifestPath = path.resolve(process.cwd(), MANIFEST_PATH);
+          let manifest: { components: Record<string, string[]> } = { components: {} };
+          try {
+            const raw = await fs.readFile(manifestPath, "utf8");
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              manifest = { components: { ...(parsed.components || {}) } };
+            }
+          } catch {
+            // will create fresh manifest
+          }
+
+          const section = manifest.components;
+          const list = (section[kind] ||= []);
+          if (!list.includes(leaf)) list.push(leaf);
+          list.sort((a, b) => a.localeCompare(b));
+
+          await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+          await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+          console.log("Updated .nextforge/manifest.json");
+        } catch (err) {
+          console.warn(
+            "Manifest update skipped:",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`add:component failed: ${msg}`);
