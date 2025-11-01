@@ -288,12 +288,12 @@ function chooseTemplate(
  * Validate and normalize group option with helpful error message.
  */
 function validateGroup(input: string | undefined): Kind {
-  const allowed: Kind[] = ["ui", "layout", "section", "feature"];
-  const group = (input ?? "ui").toLowerCase().trim() as Kind;
-  if (!allowed.includes(group)) {
+  const allowed = ["ui", "layout", "section", "feature"] as const;
+  const kind = (input ?? "ui").toLowerCase().trim() as Kind;
+  if (!allowed.includes(kind)) {
     throw new Error(`Invalid --group "${input}". Use one of: ${allowed.join(", ")}`);
   }
-  return group;
+  return kind;
 }
 
 /**
@@ -390,9 +390,17 @@ export function registerAddComponent(program: Command) {
         );
 
         if (program.opts().verbose) {
-          console.log(
-            `ℹ️  Template: ${config.useChakra && config.useTailwind ? "Chakra+Tailwind" : config.useChakra ? "Chakra" : config.useTailwind ? "Tailwind" : "Basic"}, Client: ${isClient}`
-          );
+          const templateType =
+            config.useChakra && config.useTailwind
+              ? "Chakra+Tailwind"
+              : config.useChakra
+                ? "Chakra"
+                : config.useTailwind
+                  ? "Tailwind"
+                  : "Basic";
+          console.log(`ℹ️  Template: ${templateType}, Client: ${isClient}`);
+          console.log(`ℹ️  Component path: ${path.relative(process.cwd(), componentPath)}`);
+          console.log(`ℹ️  Group: ${kind}`);
         }
         await writeIfAbsent(componentPath, componentCode, !!opts.force);
 
@@ -439,8 +447,13 @@ export const ${leaf}Styles: SystemStyleObject = {
 };
 `;
             await writeIfAbsent(stylePath, styleCode, !!opts.force);
-          } else if (!config.useTailwind) {
-            // Only create CSS module when Tailwind is NOT enabled
+          } else if (config.useTailwind) {
+            // Tailwind detected - skip CSS Module creation (even with --with-style)
+            console.log(
+              `ℹ️  Tailwind detected — skipping CSS module file. Use utility classes instead.`
+            );
+          } else {
+            // Basic CSS module when neither Chakra nor Tailwind is enabled
             const stylePath = path.join(dir, `${leaf}.module.css`);
             const styleCode = `.container {
   padding: 1.5rem;
@@ -457,23 +470,21 @@ export const ${leaf}Styles: SystemStyleObject = {
 }
 `;
             await writeIfAbsent(stylePath, styleCode, !!opts.force);
-          } else {
-            // Tailwind detected - skip CSS Module creation
-            if (program.opts().verbose) {
-              console.log(
-                `ℹ️  Tailwind detected — skipping CSS Module creation (use utility classes).`
-              );
-            }
           }
         }
 
         if (opts.withStory) {
           const storyPath = path.join(dir, `${leaf}.stories.tsx`);
+          const title = [`components`, kind, leaf].join("/");
           const storyCode = `import type { Meta, StoryObj } from "@storybook/react";
 import ${leaf} from "./${leaf}";
-const meta: Meta<typeof ${leaf}> = { title: "components/${kind}/${leaf}", component: ${leaf} };
+
+const meta = { title: "${title}", component: ${leaf} } satisfies Meta<typeof ${leaf}>;
 export default meta;
-export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
+
+type Story = StoryObj<typeof meta>;
+
+export const Primary: Story = { args: {} };
 `;
           await writeIfAbsent(storyPath, storyCode, !!opts.force);
         }
@@ -499,7 +510,7 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
           console.warn("Barrel update skipped:", err instanceof Error ? err.message : String(err));
         }
 
-        // === Manifest update (atomic write) ===
+        // === Manifest update (atomic write with uniqueness) ===
         try {
           const manifestPath = path.resolve(process.cwd(), MANIFEST_PATH);
           let manifest: { components: Record<string, string[]> } = { components: {} };
@@ -513,16 +524,19 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
             // will create fresh manifest
           }
 
-          const section = manifest.components;
-          const list = (section[kind] ||= []);
-          if (!list.includes(leaf)) list.push(leaf);
-          list.sort((a, b) => a.localeCompare(b));
+          // Use Set to maintain uniqueness per group
+          const list = new Set(manifest.components[kind] ?? []);
+          list.add(leaf);
+          manifest.components[kind] = [...list].sort((a, b) => a.localeCompare(b));
 
           // Atomic write: write to temp file then rename
           await fs.mkdir(path.dirname(manifestPath), { recursive: true });
           const tmpPath = manifestPath + ".tmp";
           await fs.writeFile(tmpPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
           await fs.rename(tmpPath, manifestPath);
+          if (program.opts().verbose) {
+            console.log(`ℹ️  Updated manifest: added ${leaf} to ${kind} group`);
+          }
           console.log("Updated .nextforge/manifest.json");
         } catch (err) {
           console.warn(
