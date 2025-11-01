@@ -314,6 +314,30 @@ describe("add:component", () => {
     expect(code).toContain("Box");
   });
 
+  it("--framework both creates ChakraTailwind template", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: false, useTailwind: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI([
+      "add:component",
+      "Hybrid",
+      "--group",
+      "ui",
+      "--framework",
+      "both",
+      "--app",
+      "app",
+    ]);
+
+    const code = await readText("app/components/ui/Hybrid/Hybrid.tsx");
+    expect(code).toContain("@chakra-ui/react");
+    expect(code).toContain('className="');
+    expect(code).toContain("Box");
+  });
+
   // Template existence verified by existing tests:
   // - "creates a Tailwind UI component" verifies tplTailwind
   // - "creates Chakra component with client directive" verifies tplChakra
@@ -401,10 +425,10 @@ describe("add:component", () => {
 
     await expect(
       runCLI(["add:component", "Button", "--group", "ui", "--framework", "invalid", "--app", "app"])
-    ).rejects.toThrow(/Invalid --framework.*Use one of: chakra, tailwind, basic/);
+    ).rejects.toThrow(/Invalid --framework.*Use one of: chakra, tailwind, basic, both/);
   });
 
-  it("client directive is exactly first line when --client is used", async () => {
+  it("places 'use client' on line 1", async () => {
     await fs.mkdir("app", { recursive: true });
     await fs.writeFile(
       "nextforge.config.json",

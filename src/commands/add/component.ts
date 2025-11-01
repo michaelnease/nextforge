@@ -346,7 +346,7 @@ export function registerAddComponent(program: Command) {
 
         const fileCfg = await loadConfig({ verbose: !!program.opts().verbose });
         // Validate --framework flag if provided
-        const allowed = ["chakra", "tailwind", "basic"] as const;
+        const allowed = ["chakra", "tailwind", "basic", "both"] as const;
         const fw = opts.framework ? String(opts.framework).toLowerCase().trim() : undefined;
         if (fw && !allowed.includes(fw as (typeof allowed)[number])) {
           throw new Error(
@@ -361,7 +361,9 @@ export function registerAddComponent(program: Command) {
               ? { useChakra: false, useTailwind: true }
               : fw === "basic"
                 ? { useChakra: false, useTailwind: false }
-                : {};
+                : fw === "both"
+                  ? { useChakra: true, useTailwind: true }
+                  : {};
         const flagsCfg = {
           // Do not override pagesDir with --app here; prefer config.pagesDir
           ...fwOverride,
