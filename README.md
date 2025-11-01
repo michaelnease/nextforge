@@ -327,6 +327,23 @@ export default function Shell({ children }: ShellProps) {
 
 NextForge maintains a `.nextforge/manifest.json` file that tracks all generated components. This file is automatically updated when components are created and uses atomic writes to prevent corruption during concurrent runs.
 
+**Manifest Structure:**
+
+The manifest stores component **names** (not paths) grouped by component type:
+
+```json
+{
+  "components": {
+    "ui": ["Button", "Card", "Input"],
+    "layout": ["Shell", "Container"],
+    "section": ["Hero", "Features"],
+    "feature": ["Auth", "Dashboard"]
+  }
+}
+```
+
+**Design Decision:** The manifest uses component names per group rather than full paths. This keeps the manifest simple for UI menus and component listings, but means components with the same name in different subfolders will appear as duplicates. If you need globally unique tracking, use the actual file system structure or external tooling.
+
 #### Barrel Exports
 
 Components are automatically exported from barrel files (`components/<group>/index.ts`) for convenient imports:

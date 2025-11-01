@@ -389,7 +389,9 @@ describe("add:component", () => {
     const barrel = await readText("app/components/ui/index.ts");
     // POSIX paths use forward slashes, even on Windows
     expect(barrel).not.toContain("\\");
-    expect(barrel).toMatch(/export.*from.*["'].*Button.*Button["']/);
+    // Verify forward slashes are used in import paths
+    expect(barrel).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    expect(barrel).toMatch(/export.*from.*["'].*\/.*["']/);
   });
 
   it("framework precedence: config Tailwind but --framework chakra → Chakra output", async () => {
@@ -461,5 +463,63 @@ describe("add:component", () => {
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app", "--force"]);
     const thirdCode = await readText("app/components/ui/Button/Button.tsx");
     expect(thirdCode).toBe(firstCode); // Should be overwritten (same template)
+  });
+
+  it("--force applies to style and story files", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: true, useTailwind: false, pagesDir: "app" }, null, 2)
+    );
+
+    // Create with style and story first time
+    await runCLI([
+      "add:component",
+      "Card",
+      "--group",
+      "ui",
+      "--with-style",
+      "--with-story",
+      "--app",
+      "app",
+    ]);
+
+    const stylePath = "app/components/ui/Card/Card.styles.ts";
+    const storyPath = "app/components/ui/Card/Card.stories.tsx";
+    const firstStyle = await readText(stylePath);
+    const firstStory = await readText(storyPath);
+
+    // Try to create again without --force (should skip)
+    await runCLI([
+      "add:component",
+      "Card",
+      "--group",
+      "ui",
+      "--with-style",
+      "--with-story",
+      "--app",
+      "app",
+    ]);
+    const secondStyle = await readText(stylePath);
+    const secondStory = await readText(storyPath);
+    expect(firstStyle).toBe(secondStyle);
+    expect(firstStory).toBe(secondStory);
+
+    // Create with --force (should overwrite)
+    await runCLI([
+      "add:component",
+      "Card",
+      "--group",
+      "ui",
+      "--with-style",
+      "--with-story",
+      "--app",
+      "app",
+      "--force",
+    ]);
+    const thirdStyle = await readText(stylePath);
+    const thirdStory = await readText(storyPath);
+    expect(thirdStyle).toBe(firstStyle); // Should be overwritten
+    expect(thirdStory).toBe(firstStory); // Should be overwritten
   });
 });
