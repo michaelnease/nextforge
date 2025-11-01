@@ -183,7 +183,7 @@ Components are organized into four groups, each placed in a specific directory:
 
 - `--group <type>` - Component group: `ui` | `layout` | `section` | `feature` (default: `ui`)
 - `--app <dir>` - App directory (default: `app`)
-- `--framework <name>` - Override template: `chakra` | `tailwind` | `basic` (takes precedence over `nextforge.config.json`)
+- `--framework <name>` - Override template: `chakra` | `tailwind` | `basic` | `both` (takes precedence over `nextforge.config.json`)
 - `--client` - Add `"use client"` directive for client components (default: server component)
 - `--with-tests` - Create a Vitest test file (`Component.test.tsx`)
 - `--with-style` - Create a style file (`.styles.ts` for Chakra, `.module.css` for basic, skipped for Tailwind)
@@ -218,6 +218,29 @@ export default function Counter({ title, subtitle }: CounterProps) {
   // ...
 }
 ```
+
+#### Framework Selection
+
+The framework template is chosen based on this precedence:
+
+1. **`--framework` flag** (highest precedence) - Explicitly override template
+2. **`nextforge.config.json`** - Project-wide configuration
+3. **Default** - Basic template if no framework detected
+
+**Examples:**
+
+```bash
+# Override config to use Tailwind
+nextforge add:component Button --group ui --framework tailwind
+
+# Use Chakra with client directive and tests
+nextforge add:component Counter --group ui --framework chakra --client --with-tests
+
+# Both frameworks (Chakra + Tailwind utilities)
+nextforge add:component Hybrid --group ui --framework both
+```
+
+**Note:** When `--framework tailwind` or `useTailwind: true` is active, `--with-style` skips CSS module creation. Use Tailwind utility classes instead.
 
 #### Style File Generation
 

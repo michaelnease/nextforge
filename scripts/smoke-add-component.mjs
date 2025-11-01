@@ -83,6 +83,17 @@ async function testConfig(name, config, variantDir, repoRoot) {
     throw new Error("Component missing 'use client' directive");
   }
 
+  // Assert barrel file contains correct export line (POSIX path normalization)
+  const barrelPath = path.join(variantDir, "app", "components", "ui", "index.ts");
+  const barrelContent = await fs.readFile(barrelPath, "utf8");
+  if (!barrelContent.includes("export { default as Button }")) {
+    throw new Error("Barrel file missing export line");
+  }
+  // Verify POSIX paths (no backslashes)
+  if (barrelContent.includes("\\")) {
+    throw new Error("Barrel file contains Windows path separators (should use POSIX)");
+  }
+
   console.log(`✓ ${name} config: All files created correctly`);
 }
 
