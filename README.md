@@ -16,7 +16,7 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 - **ESLint + Prettier** for code quality
 - **Vitest** for fast testing
 - **TypeScript declarations** for library consumers
-- **Comprehensive CI/CD** with GitHub Actions
+- **Comprehensive CI/CD** with GitHub Actions (see `.github/workflows/ci.yml`)
 
 ### 📦 **Built-in Utilities**
 
@@ -183,7 +183,7 @@ Components are organized into four groups, each placed in a specific directory:
 
 - `--group <type>` - Component group: `ui` | `layout` | `section` | `feature` (default: `ui`)
 - `--app <dir>` - App directory (default: `app`)
-- `--framework <name>` - Override template: `chakra` | `tailwind` | `basic` | `both`
+- `--framework <name>` - Override template: `chakra` | `tailwind` | `basic` (takes precedence over `nextforge.config.json`)
 - `--client` - Add `"use client"` directive for client components (default: server component)
 - `--with-tests` - Create a Vitest test file (`Component.test.tsx`)
 - `--with-style` - Create a style file (`.styles.ts` for Chakra, `.module.css` for basic, skipped for Tailwind)
