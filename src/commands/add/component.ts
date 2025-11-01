@@ -81,35 +81,43 @@ function toPosix(p: string): string {
 
 /**
  * Generate export line with POSIX-normalized import path.
+ * Calculates relative path from barrel file to component file.
  */
-function exportLine(relPathFromKind: string, leaf: string): string {
-  const normalizedPath = toPosix(relPathFromKind);
-  return (
-    `export { default as ${leaf} } from "./${normalizedPath}/${leaf}";\n` +
-    `export * from "./${normalizedPath}/${leaf}";\n`
+function generateExportLine(
+  barrelPath: string,
+  componentPath: string,
+  componentName: string
+): string {
+  const importPath = toPosix(
+    path.relative(path.dirname(barrelPath), componentPath).replace(/\.(tsx|ts|jsx|js)$/, "")
   );
+  return `export { default as ${componentName} } from "${importPath}";`;
 }
 
 /**
- * Idempotently append export lines to barrel file.
+ * Idempotently append export line to barrel file.
  * Checks for exact match before appending to avoid duplicates.
+ * Preserves trailing newline.
  */
 async function appendExportIfMissing(
-  kindIndexPath: string,
-  relPathFromKind: string,
-  leaf: string
+  barrelPath: string,
+  componentPath: string,
+  componentName: string
 ): Promise<void> {
-  const current = await readIfExists(kindIndexPath);
-  const snippet = exportLine(relPathFromKind, leaf);
-  const exportLineMatch = snippet.trim().split("\n")[0];
-  // Check if exact export line already exists
-  if (
-    exportLineMatch &&
-    !current.split(/\r?\n/).some((line) => line.trim() === exportLineMatch.trim())
-  ) {
-    const next = current + (current && !current.endsWith("\n") ? "\n" : "") + snippet;
-    await fs.mkdir(path.dirname(kindIndexPath), { recursive: true });
-    await fs.writeFile(kindIndexPath, next, "utf8");
+  const exportLine = generateExportLine(barrelPath, componentPath, componentName);
+  let prior = "";
+  try {
+    prior = await fs.readFile(barrelPath, "utf8");
+  } catch {
+    // File doesn't exist yet
+  }
+
+  // Check if export line already exists
+  if (!prior.split(/\r?\n/).some((line) => line.trim() === exportLine.trim())) {
+    const prefixNL = prior && !prior.endsWith("\n") ? "\n" : "";
+    const next = prior + prefixNL + exportLine + "\n";
+    await fs.mkdir(path.dirname(barrelPath), { recursive: true });
+    await fs.writeFile(barrelPath, next, "utf8");
   }
 }
 
@@ -449,9 +457,11 @@ export const ${leaf}Styles: SystemStyleObject = {
             await writeIfAbsent(stylePath, styleCode, !!opts.force);
           } else if (config.useTailwind) {
             // Tailwind detected - skip CSS Module creation (even with --with-style)
-            console.log(
-              `ℹ️  Tailwind detected — skipping CSS module file. Use utility classes instead.`
-            );
+            if (program.opts().verbose) {
+              console.log(
+                `ℹ️  Tailwind detected — skipping CSS module creation. Use utility classes instead.`
+              );
+            }
           } else {
             // Basic CSS module when neither Chakra nor Tailwind is enabled
             const stylePath = path.join(dir, `${leaf}.module.css`);
@@ -496,15 +506,20 @@ export const Primary: Story = { args: {} };
         try {
           const barrelEnabled = (config as Record<string, unknown>).barrelExports !== false;
           if (barrelEnabled) {
-            const relFolder = subdirs.length ? [...subdirs, leaf].join("/") : leaf;
             const kindIndexPath = path.join(baseDir, "components", kind, "index.ts");
             const before = await readIfExists(kindIndexPath);
-            await appendExportIfMissing(kindIndexPath, relFolder, leaf);
+            await appendExportIfMissing(kindIndexPath, componentPath, leaf);
             await sortBarrel(kindIndexPath);
             const wasCreated = before === "";
-            console.log(
-              `${wasCreated ? "Created" : "Updated"} barrel: components/${kind}/index.ts`
-            );
+            if (program.opts().verbose) {
+              console.log(
+                `ℹ️  ${wasCreated ? "Created" : "Updated"} barrel: ${path.relative(process.cwd(), kindIndexPath)}`
+              );
+            } else {
+              console.log(
+                `${wasCreated ? "Created" : "Updated"} barrel: components/${kind}/index.ts`
+              );
+            }
           }
         } catch (err) {
           console.warn("Barrel update skipped:", err instanceof Error ? err.message : String(err));

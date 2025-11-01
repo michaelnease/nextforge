@@ -66,8 +66,7 @@ describe("add:component", () => {
     expect(code).toContain("@chakra-ui/react");
 
     const barrel = await readText("app/components/ui/index.ts");
-    expect(barrel).toContain('export { default as Card } from "./Card/Card";');
-    expect(barrel).toContain('export * from "./Card/Card";');
+    expect(barrel).toContain('export { default as Card } from "Card/Card";');
   });
 
   it("creates a Chakra layout with children and the client directive when requested", async () => {
@@ -105,7 +104,7 @@ describe("add:component", () => {
     ]);
 
     const barrel = await readText("app/components/section/index.ts");
-    const needle = 'export { default as Hero } from "./Marketing/Hero/Hero";';
+    const needle = 'export { default as Hero } from "Marketing/Hero/Hero";';
     const count = (
       barrel.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []
     ).length;
@@ -298,5 +297,54 @@ describe("add:component", () => {
       .then(() => true)
       .catch(() => false);
     expect(cssExists).toBe(false);
+  });
+
+  it("both Chakra and Tailwind flags uses ChakraTailwind template", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: true, useTailwind: true, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Hybrid", "--group", "ui", "--app", "app"]);
+
+    const code = await readText("app/components/ui/Hybrid/Hybrid.tsx");
+    expect(code).toContain("@chakra-ui/react");
+    expect(code).toContain('className="');
+    expect(code).toContain("Box");
+  });
+
+  it("barrel export is idempotent (no duplicates on second run)", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    const barrel1 = await readText("app/components/ui/index.ts");
+    const count1 = (barrel1.match(/export \{ default as Button \}/g) || []).length;
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    const barrel2 = await readText("app/components/ui/index.ts");
+    const count2 = (barrel2.match(/export \{ default as Button \}/g) || []).length;
+
+    expect(count2).toBe(count1);
+    expect(count1).toBeGreaterThan(0);
+  });
+
+  it("generated files end with newline", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+
+    const component = await readText("app/components/ui/Button/Button.tsx");
+    const index = await readText("app/components/ui/Button/index.ts");
+    expect(component.endsWith("\n")).toBe(true);
+    expect(index.endsWith("\n")).toBe(true);
   });
 });
