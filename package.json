@@ -33,6 +33,8 @@
     "format:check": "prettier --check .",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:watch": "vitest",
+    "smoke:add-component": "node scripts/smoke-add-component.mjs",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "zip:pr": "node scripts/zip-pr-diff.mjs",

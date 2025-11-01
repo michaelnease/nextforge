@@ -24,16 +24,23 @@ async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
 }
 
-async function writeFileSafe(file: string, contents: string, force: boolean) {
+/** Write a file if missing, unless --force is set. */
+async function writeIfAbsent(filePath: string, contents: string, force = false): Promise<boolean> {
   try {
     if (!force) {
-      await fs.access(file);
-      return; // already exists; skip
+      await fs.access(filePath);
+      console.log(`skip  ${path.relative(process.cwd(), filePath)} (exists)`);
+      return false;
     }
   } catch {
-    // file does not exist; proceed to write
+    // file missing, fall through and write
   }
-  await fs.writeFile(file, contents, "utf8");
+  if (force) {
+    console.log(`force overwrite -> ${path.relative(process.cwd(), filePath)}`);
+  }
+  await fs.writeFile(filePath, contents, "utf8");
+  console.log(`write ${path.relative(process.cwd(), filePath)}`);
+  return true;
 }
 
 function withClientHeader(code: string, isClient: boolean) {
@@ -242,25 +249,33 @@ function chooseTemplate(
 
 function assertKind(k: string): asserts k is Kind {
   if (!["ui", "layout", "section", "feature"].includes(k)) {
-    throw new Error(`Invalid --kind "${k}". Use ui, layout, section, or feature.`);
+    throw new Error(`Invalid --group "${k}". Use ui, layout, section, or feature.`);
   }
+}
+
+/**
+ * Get the component directory path based on group type.
+ */
+function getComponentDir(baseDir: string, group: Kind, subdirs: string[], leaf: string): string {
+  return path.join(baseDir, "components", group, ...subdirs, leaf);
 }
 
 export function registerAddComponent(program: Command) {
   program
     .command("add:component")
-    .description("Create a component in <app>/components/<kind>/<Name>")
+    .description("Create a component in <app>/components/<group>/<Name>")
     .argument("<name>", "Component name, e.g. Button or marketing/Hero")
-    .requiredOption("--kind <kind>", "ui | layout | section | feature")
+    .option("--group <type>", "Component group: ui | layout | section | feature", "ui")
     .option("--app <dir>", "App directory (default: app)", "app")
     .option("--framework <name>", "Override template: chakra | tailwind | basic | both")
     .option("--client", "Mark as a client component", false)
-    .option("--with-test", "Create a basic test file", false)
+    .option("--with-tests", "Create a basic test file", false)
+    .option("--with-style", "Create a CSS or Chakra style file", false)
     .option("--with-story", "Create a Storybook story file", false)
     .option("--force", "Overwrite existing files", false)
     .action(async (name, opts) => {
       try {
-        const kind = String(opts.kind);
+        const kind = String(opts.group || "ui");
         assertKind(kind as string);
 
         const parts = String(name)
@@ -301,7 +316,7 @@ export function registerAddComponent(program: Command) {
                   ? { useChakra: true, useTailwind: true }
                   : {};
         const flagsCfg = {
-          pagesDir: opts.app,
+          // Do not override pagesDir with --app here; prefer config.pagesDir
           ...fwOverride,
         } as Partial<{ pagesDir: string; useChakra: boolean; useTailwind: boolean }>;
         const config = mergeConfig({
@@ -311,7 +326,7 @@ export function registerAddComponent(program: Command) {
         });
 
         const baseDir = path.resolve(process.cwd(), config.pagesDir);
-        const dir = path.join(baseDir, "components", kind, ...subdirs, leaf);
+        const dir = getComponentDir(baseDir, kind as Kind, subdirs, leaf);
 
         await ensureDir(dir);
 
@@ -324,10 +339,10 @@ export function registerAddComponent(program: Command) {
           { useChakra: config.useChakra, useTailwind: config.useTailwind },
           Boolean(opts.client)
         );
-        await writeFileSafe(componentPath, componentCode, Boolean(opts.force));
+        await writeIfAbsent(componentPath, componentCode, Boolean(opts.force));
 
         const indexCode = `export { default } from "./${leaf}";\nexport * from "./${leaf}";\n`;
-        await writeFileSafe(indexPath, indexCode, Boolean(opts.force));
+        await writeIfAbsent(indexPath, indexCode, Boolean(opts.force));
 
         if (kind === "feature") {
           const hookPath = path.join(dir, `use${leaf}.ts`);
@@ -337,10 +352,10 @@ export function use${leaf}() {
   return { state, setState };
 }
 `;
-          await writeFileSafe(hookPath, hookCode, Boolean(opts.force));
+          await writeIfAbsent(hookPath, hookCode, Boolean(opts.force));
         }
 
-        if (opts.withTest) {
+        if (opts.withTests) {
           const testPath = path.join(dir, `${leaf}.test.tsx`);
           const testCode = `import { describe, it, expect } from "vitest";
 import ${leaf} from "./${leaf}";
@@ -348,7 +363,45 @@ describe("${leaf}", () => {
   it("is defined", () => { expect(${leaf}).toBeDefined(); });
 });
 `;
-          await writeFileSafe(testPath, testCode, Boolean(opts.force));
+          await writeIfAbsent(testPath, testCode, Boolean(opts.force));
+        }
+
+        if (opts.withStyle) {
+          if (config.useChakra) {
+            const stylePath = path.join(dir, `${leaf}.styles.ts`);
+            const styleCode = `import { SystemStyleObject } from "@chakra-ui/react";
+
+export const ${leaf}Styles: SystemStyleObject = {
+  container: {
+    py: 6,
+  },
+  heading: {
+    size: "md",
+  },
+  text: {
+    mt: 2,
+  },
+};
+`;
+            await writeIfAbsent(stylePath, styleCode, Boolean(opts.force));
+          } else {
+            const stylePath = path.join(dir, `${leaf}.module.css`);
+            const styleCode = `.container {
+  padding: 1.5rem;
+}
+
+.heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.text {
+  margin-top: 0.5rem;
+  color: rgb(107, 114, 128);
+}
+`;
+            await writeIfAbsent(stylePath, styleCode, Boolean(opts.force));
+          }
         }
 
         if (opts.withStory) {
@@ -359,11 +412,11 @@ const meta: Meta<typeof ${leaf}> = { title: "components/${kind}/${leaf}", compon
 export default meta;
 export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
 `;
-          await writeFileSafe(storyPath, storyCode, Boolean(opts.force));
+          await writeIfAbsent(storyPath, storyCode, Boolean(opts.force));
         }
 
-        const rel = path.relative(process.cwd(), dir) || dir;
-        console.log(`Created component at ${rel}`);
+        const componentDir = path.relative(process.cwd(), path.dirname(componentPath));
+        console.log(`✅ Created component ${leaf} in ${componentDir}`);
 
         // === Barrel update (per-kind re-exports) ===
         try {
