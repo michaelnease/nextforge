@@ -137,48 +137,181 @@ export default {
 
 ### Component Generation
 
-Scaffold reusable components under `<app>/components/<kind>/<Name>`.
+Scaffold reusable components under `<app>/components/<group>/<Name>`. Components are automatically placed in the correct directory based on their group type and include proper TypeScript types, client/server directives, and framework-specific templates.
 
-````bash
-# Basic UI component
-nextforge add:component Button --kind ui --app app
+```bash
+# Basic UI component (default group is "ui")
+nextforge add:component Button --group ui
 
 # Layout component (accepts children)
-nextforge add:component Shell --kind layout --app app
+nextforge add:component Shell --group layout
 
 # Nested sections
-nextforge add:component marketing/Hero --kind section --app app
+nextforge add:component marketing/Hero --group section
 
-# Feature component with extras
-nextforge add:component Auth --kind feature --with-test --with-story --client --app app
+# Feature component with tests, styles, and client directive
+nextforge add:component Auth --group feature --with-tests --with-style --client
 
 # Override framework per-run
-nextforge add:component Hero --kind section --framework chakra --app app
-nextforge add:component Card --kind ui --framework tailwind --app app
-nextforge add:component Shell --kind layout --framework both --app app
+nextforge add:component Hero --group section --framework chakra
+nextforge add:component Card --group ui --framework tailwind
+nextforge add:component Shell --group layout --framework both
 
-# Client components and typed props
-nextforge add:component Hero --kind section --client --app app
+# Tailwind: CSS modules skipped (use utility classes)
+nextforge add:component Badge --group ui --with-style
 
-This generates a component with typed props:
+# Chakra: Creates .styles.ts file
+nextforge add:component Card --group ui --with-style
 
-```ts
-export interface HeroProps {
+# Basic (no framework): Creates .module.css file
+nextforge add:component Badge --group ui --with-style
+
+# Overwrite existing files
+nextforge add:component Button --group ui --force
+```
+
+#### Component Groups
+
+Components are organized into four groups, each placed in a specific directory:
+
+- **`ui`** (default) → `components/ui/` - Reusable UI components (buttons, cards, inputs)
+- **`layout`** → `components/layout/` - Layout components that accept children
+- **`section`** → `components/section/` - Page sections and content blocks
+- **`feature`** → `components/feature/` - Feature-specific components (includes a custom hook)
+
+#### Component Options
+
+- `--group <type>` - Component group: `ui` | `layout` | `section` | `feature` (default: `ui`)
+- `--app <dir>` - App directory (default: `app`)
+- `--framework <name>` - Override template: `chakra` | `tailwind` | `basic` | `both`
+- `--client` - Add `"use client"` directive for client components (default: server component)
+- `--with-tests` - Create a Vitest test file (`Component.test.tsx`)
+- `--with-style` - Create a style file (`.styles.ts` for Chakra, `.module.css` for basic, skipped for Tailwind)
+- `--with-story` - Create a Storybook story file (`Component.stories.tsx`)
+- `--force` - Overwrite existing files
+
+#### Client vs Server Components
+
+By default, components are created as **server components** (no `"use client"` directive). Use the `--client` flag to create client components:
+
+```bash
+# Server component (default)
+nextforge add:component Button --group ui
+
+# Client component
+nextforge add:component Counter --group ui --client
+```
+
+The generated component will include the `"use client"` directive at the top when `--client` is used:
+
+```tsx
+"use client";
+
+import React from "react";
+
+export interface CounterProps {
   title?: string;
   subtitle?: string;
 }
 
-export default function Hero({ title, subtitle }: HeroProps) {
+export default function Counter({ title, subtitle }: CounterProps) {
   // ...
 }
-````
+```
 
-````
+#### Style File Generation
 
-#### Component Options
+The `--with-style` flag behavior depends on your framework configuration:
 
-- `--kind <kind>` - One of: ui, layout, section, feature (required)
-- `--app <dir>` - App directory (default: `app`)
+- **Chakra enabled** → Creates `.styles.ts` with `SystemStyleObject` definitions
+- **Tailwind enabled** → Skips CSS module creation (use utility classes instead)
+- **Basic (no framework)** → Creates `.module.css` with CSS module styles
+
+```bash
+# Chakra style file
+nextforge add:component Card --group ui --with-style
+# → Creates: Card.styles.ts
+
+# Tailwind (skipped)
+nextforge add:component Badge --group ui --with-style
+# → No CSS file created (use Tailwind utilities)
+
+# Basic CSS module
+nextforge add:component Badge --group ui --with-style
+# → Creates: Badge.module.css
+```
+
+#### Generated Templates
+
+Components adapt to your framework configuration (detected from `nextforge.config.json`):
+
+**Tailwind Component:**
+
+```tsx
+import React from "react";
+
+export interface ButtonProps {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function Button({ title, subtitle }: ButtonProps) {
+  return (
+    <section className="p-6">
+      <h2 className="text-xl font-semibold">Button</h2>
+      {title ? <p className="mt-2 text-gray-600">{title}</p> : null}
+    </section>
+  );
+}
+```
+
+**Chakra Component:**
+
+```tsx
+import React from "react";
+import { Box, Heading, Text } from "@chakra-ui/react";
+
+export interface ButtonProps {
+  title?: string;
+  subtitle?: string;
+}
+
+export default function Button({ title, subtitle }: ButtonProps) {
+  return (
+    <Box py={6}>
+      <Heading size="md">Button</Heading>
+      {title ? <Text mt={2}>{title}</Text> : null}
+    </Box>
+  );
+}
+```
+
+**Layout Component (accepts children):**
+
+```tsx
+import React, { type ReactNode } from "react";
+
+export interface ShellProps {
+  children: ReactNode;
+}
+
+export default function Shell({ children }: ShellProps) {
+  return <div className="container mx-auto px-4">{children}</div>;
+}
+```
+
+#### Manifest File
+
+NextForge maintains a `.nextforge/manifest.json` file that tracks all generated components. This file is automatically updated when components are created and uses atomic writes to prevent corruption during concurrent runs.
+
+#### Barrel Exports
+
+Components are automatically exported from barrel files (`components/<group>/index.ts`) for convenient imports:
+
+```tsx
+import { Button, Card } from "@/components/ui";
+```
+
 - `--client` - Add "use client" header
 - `--with-test` - Create a basic Vitest test file
 - `--with-story` - Create a Storybook story file
@@ -246,7 +379,7 @@ export default function Page() {
     </section>
   );
 }
-````
+```
 
 **Async Server Component:**
 

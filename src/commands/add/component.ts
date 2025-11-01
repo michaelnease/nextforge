@@ -12,28 +12,48 @@ const MANIFEST_PATH = ".nextforge/manifest.json";
 
 type Kind = "ui" | "layout" | "section" | "feature";
 
-function pascalCase(s: string) {
-  return s
-    .replace(/[/\s_-]+/g, " ")
+/**
+ * Normalize component name to PascalCase and validate it.
+ * Rejects names starting with numbers or containing illegal characters.
+ */
+function toPascalCase(input: string): string {
+  const core = input.trim().replace(/[^a-zA-Z0-9]+/g, " ");
+  if (!core) {
+    throw new Error("Component name is required");
+  }
+  const name = core
     .split(" ")
     .filter(Boolean)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
     .join("");
+  if (!/^[A-Z][A-Za-z0-9]*$/.test(name)) {
+    throw new Error(
+      `Invalid component name "${input}". Use letters/numbers; must start with a letter.`
+    );
+  }
+  return name;
 }
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
 }
 
-async function writeFileSafe(file: string, contents: string, force: boolean) {
+/** Write a file if missing, unless --force is set. */
+async function writeIfAbsent(filePath: string, contents: string, force = false): Promise<boolean> {
   try {
     if (!force) {
-      await fs.access(file);
-      return; // already exists; skip
+      await fs.access(filePath);
+      console.log(`skip  ${path.relative(process.cwd(), filePath)} (exists)`);
+      return false;
     }
   } catch {
-    // file does not exist; proceed to write
+    // file missing, fall through and write
   }
-  await fs.writeFile(file, contents, "utf8");
+  if (force) {
+    console.log(`force overwrite -> ${path.relative(process.cwd(), filePath)}`);
+  }
+  await fs.writeFile(filePath, contents, "utf8");
+  console.log(`write ${path.relative(process.cwd(), filePath)}`);
+  return true;
 }
 
 function withClientHeader(code: string, isClient: boolean) {
@@ -52,20 +72,52 @@ async function readIfExists(file: string): Promise<string> {
   }
 }
 
-function exportLine(kindPathToLeaf: string, leaf: string) {
-  return (
-    `export { default as ${leaf} } from "./${kindPathToLeaf}/${leaf}";\n` +
-    `export * from "./${kindPathToLeaf}/${leaf}";\n`
-  );
+/**
+ * Convert a path to POSIX format (forward slashes) for consistent imports across OS.
+ */
+function toPosix(p: string): string {
+  return p.split(path.sep).join("/");
 }
 
-async function appendExportIfMissing(kindIndexPath: string, relPathFromKind: string, leaf: string) {
-  const current = await readIfExists(kindIndexPath);
-  const snippet = exportLine(relPathFromKind, leaf);
-  if (!current.includes(`from "./${relPathFromKind}/${leaf}"`)) {
-    const next = current + snippet;
-    await fs.mkdir(path.dirname(kindIndexPath), { recursive: true });
-    await fs.writeFile(kindIndexPath, next, "utf8");
+/**
+ * Generate export line with POSIX-normalized import path.
+ * Calculates relative path from barrel file to component file.
+ */
+function generateExportLine(
+  barrelPath: string,
+  componentPath: string,
+  componentName: string
+): string {
+  const importPath = toPosix(
+    path.relative(path.dirname(barrelPath), componentPath).replace(/\.(tsx|ts|jsx|js)$/, "")
+  );
+  return `export { default as ${componentName} } from "${importPath}";`;
+}
+
+/**
+ * Idempotently append export line to barrel file.
+ * Checks for exact match before appending to avoid duplicates.
+ * Preserves trailing newline.
+ */
+async function appendExportIfMissing(
+  barrelPath: string,
+  componentPath: string,
+  componentName: string
+): Promise<void> {
+  const exportLine = generateExportLine(barrelPath, componentPath, componentName);
+  let prior = "";
+  try {
+    prior = await fs.readFile(barrelPath, "utf8");
+  } catch {
+    // File doesn't exist yet
+  }
+
+  // Check if export line already exists
+  if (!prior.split(/\r?\n/).some((line) => line.trim() === exportLine.trim())) {
+    const prefixNL = prior && !prior.endsWith("\n") ? "\n" : "";
+    const next = prior + prefixNL + exportLine + "\n";
+    await fs.mkdir(path.dirname(barrelPath), { recursive: true });
+    await fs.writeFile(barrelPath, next, "utf8");
   }
 }
 
@@ -240,28 +292,41 @@ function chooseTemplate(
   return tplBasic(name, isClient);
 }
 
-function assertKind(k: string): asserts k is Kind {
-  if (!["ui", "layout", "section", "feature"].includes(k)) {
-    throw new Error(`Invalid --kind "${k}". Use ui, layout, section, or feature.`);
+/**
+ * Validate and normalize group option with helpful error message.
+ */
+function validateGroup(input: string | undefined): Kind {
+  const allowed = ["ui", "layout", "section", "feature"] as const;
+  const kind = (input ?? "ui").toLowerCase().trim() as Kind;
+  if (!allowed.includes(kind)) {
+    throw new Error(`Invalid --group "${input}". Use one of: ${allowed.join(", ")}`);
   }
+  return kind;
+}
+
+/**
+ * Get the component directory path based on group type.
+ */
+function getComponentDir(baseDir: string, group: Kind, subdirs: string[], leaf: string): string {
+  return path.join(baseDir, "components", group, ...subdirs, leaf);
 }
 
 export function registerAddComponent(program: Command) {
   program
     .command("add:component")
-    .description("Create a component in <app>/components/<kind>/<Name>")
+    .description("Create a component in <app>/components/<group>/<Name>")
     .argument("<name>", "Component name, e.g. Button or marketing/Hero")
-    .requiredOption("--kind <kind>", "ui | layout | section | feature")
+    .option("--group <type>", "Component group: ui | layout | section | feature", "ui")
     .option("--app <dir>", "App directory (default: app)", "app")
     .option("--framework <name>", "Override template: chakra | tailwind | basic | both")
     .option("--client", "Mark as a client component", false)
-    .option("--with-test", "Create a basic test file", false)
+    .option("--with-tests", "Create a basic test file", false)
+    .option("--with-style", "Create a CSS or Chakra style file", false)
     .option("--with-story", "Create a Storybook story file", false)
     .option("--force", "Overwrite existing files", false)
     .action(async (name, opts) => {
       try {
-        const kind = String(opts.kind);
-        assertKind(kind as string);
+        const kind = validateGroup(opts.group);
 
         const parts = String(name)
           .split("/")
@@ -270,13 +335,13 @@ export function registerAddComponent(program: Command) {
         if (parts.some((p) => p === "." || p === "..")) {
           throw new Error("Component path cannot contain '.' or '..'.");
         }
-        if (parts.some((p) => /[^a-z0-9-_]/i.test(p))) {
-          throw new Error(`Invalid characters in component path: ${parts.join("/")}`);
+        if (parts.length === 0) {
+          throw new Error("Component name is required");
         }
-        const leaf = pascalCase(parts.pop()!);
-        const subdirs = parts.map(pascalCase);
+        const leaf = toPascalCase(parts.pop()!);
+        const subdirs = parts.map(toPascalCase);
 
-        const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
+        const fileCfg = await loadConfig({ verbose: !!program.opts().verbose });
         const fw = (opts.framework ?? "").toString().toLowerCase().trim();
         const validFrameworks = new Set([
           "",
@@ -301,7 +366,7 @@ export function registerAddComponent(program: Command) {
                   ? { useChakra: true, useTailwind: true }
                   : {};
         const flagsCfg = {
-          pagesDir: opts.app,
+          // Do not override pagesDir with --app here; prefer config.pagesDir
           ...fwOverride,
         } as Partial<{ pagesDir: string; useChakra: boolean; useTailwind: boolean }>;
         const config = mergeConfig({
@@ -311,23 +376,44 @@ export function registerAddComponent(program: Command) {
         });
 
         const baseDir = path.resolve(process.cwd(), config.pagesDir);
-        const dir = path.join(baseDir, "components", kind, ...subdirs, leaf);
+        // Verify app directory exists
+        try {
+          await fs.access(baseDir);
+        } catch {
+          throw new Error(`App directory not found: ${baseDir}`);
+        }
+        const dir = getComponentDir(baseDir, kind, subdirs, leaf);
 
         await ensureDir(dir);
 
         const componentPath = path.join(dir, `${leaf}.tsx`);
         const indexPath = path.join(dir, "index.ts");
 
+        const isClient = !!opts.client;
         const componentCode = chooseTemplate(
-          kind as Kind,
+          kind,
           leaf,
           { useChakra: config.useChakra, useTailwind: config.useTailwind },
-          Boolean(opts.client)
+          isClient
         );
-        await writeFileSafe(componentPath, componentCode, Boolean(opts.force));
+
+        if (program.opts().verbose) {
+          const templateType =
+            config.useChakra && config.useTailwind
+              ? "Chakra+Tailwind"
+              : config.useChakra
+                ? "Chakra"
+                : config.useTailwind
+                  ? "Tailwind"
+                  : "Basic";
+          console.log(`ℹ️  Template: ${templateType}, Client: ${isClient}`);
+          console.log(`ℹ️  Component path: ${path.relative(process.cwd(), componentPath)}`);
+          console.log(`ℹ️  Group: ${kind}`);
+        }
+        await writeIfAbsent(componentPath, componentCode, !!opts.force);
 
         const indexCode = `export { default } from "./${leaf}";\nexport * from "./${leaf}";\n`;
-        await writeFileSafe(indexPath, indexCode, Boolean(opts.force));
+        await writeIfAbsent(indexPath, indexCode, !!opts.force);
 
         if (kind === "feature") {
           const hookPath = path.join(dir, `use${leaf}.ts`);
@@ -337,10 +423,10 @@ export function use${leaf}() {
   return { state, setState };
 }
 `;
-          await writeFileSafe(hookPath, hookCode, Boolean(opts.force));
+          await writeIfAbsent(hookPath, hookCode, !!opts.force);
         }
 
-        if (opts.withTest) {
+        if (opts.withTests) {
           const testPath = path.join(dir, `${leaf}.test.tsx`);
           const testCode = `import { describe, it, expect } from "vitest";
 import ${leaf} from "./${leaf}";
@@ -348,42 +434,98 @@ describe("${leaf}", () => {
   it("is defined", () => { expect(${leaf}).toBeDefined(); });
 });
 `;
-          await writeFileSafe(testPath, testCode, Boolean(opts.force));
+          await writeIfAbsent(testPath, testCode, !!opts.force);
+        }
+
+        if (opts.withStyle) {
+          if (config.useChakra) {
+            const stylePath = path.join(dir, `${leaf}.styles.ts`);
+            const styleCode = `import { SystemStyleObject } from "@chakra-ui/react";
+
+export const ${leaf}Styles: SystemStyleObject = {
+  container: {
+    py: 6,
+  },
+  heading: {
+    size: "md",
+  },
+  text: {
+    mt: 2,
+  },
+};
+`;
+            await writeIfAbsent(stylePath, styleCode, !!opts.force);
+          } else if (config.useTailwind) {
+            // Tailwind detected - skip CSS Module creation (even with --with-style)
+            if (program.opts().verbose) {
+              console.log(
+                `ℹ️  Tailwind detected — skipping CSS module creation. Use utility classes instead.`
+              );
+            }
+          } else {
+            // Basic CSS module when neither Chakra nor Tailwind is enabled
+            const stylePath = path.join(dir, `${leaf}.module.css`);
+            const styleCode = `.container {
+  padding: 1.5rem;
+}
+
+.heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.text {
+  margin-top: 0.5rem;
+  color: rgb(107, 114, 128);
+}
+`;
+            await writeIfAbsent(stylePath, styleCode, !!opts.force);
+          }
         }
 
         if (opts.withStory) {
           const storyPath = path.join(dir, `${leaf}.stories.tsx`);
+          const title = [`components`, kind, leaf].join("/");
           const storyCode = `import type { Meta, StoryObj } from "@storybook/react";
 import ${leaf} from "./${leaf}";
-const meta: Meta<typeof ${leaf}> = { title: "components/${kind}/${leaf}", component: ${leaf} };
+
+const meta = { title: "${title}", component: ${leaf} } satisfies Meta<typeof ${leaf}>;
 export default meta;
-export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
+
+type Story = StoryObj<typeof meta>;
+
+export const Primary: Story = { args: {} };
 `;
-          await writeFileSafe(storyPath, storyCode, Boolean(opts.force));
+          await writeIfAbsent(storyPath, storyCode, !!opts.force);
         }
 
-        const rel = path.relative(process.cwd(), dir) || dir;
-        console.log(`Created component at ${rel}`);
+        const componentDir = path.relative(process.cwd(), path.dirname(componentPath));
+        console.log(`✅ Created component ${leaf} in ${componentDir}`);
 
         // === Barrel update (per-kind re-exports) ===
         try {
           const barrelEnabled = (config as Record<string, unknown>).barrelExports !== false;
           if (barrelEnabled) {
-            const relFolder = subdirs.length ? [...subdirs, leaf].join("/") : leaf;
             const kindIndexPath = path.join(baseDir, "components", kind, "index.ts");
             const before = await readIfExists(kindIndexPath);
-            await appendExportIfMissing(kindIndexPath, relFolder, leaf);
+            await appendExportIfMissing(kindIndexPath, componentPath, leaf);
             await sortBarrel(kindIndexPath);
             const wasCreated = before === "";
-            console.log(
-              `${wasCreated ? "Created" : "Updated"} barrel: components/${kind}/index.ts`
-            );
+            if (program.opts().verbose) {
+              console.log(
+                `ℹ️  ${wasCreated ? "Created" : "Updated"} barrel: ${path.relative(process.cwd(), kindIndexPath)}`
+              );
+            } else {
+              console.log(
+                `${wasCreated ? "Created" : "Updated"} barrel: components/${kind}/index.ts`
+              );
+            }
           }
         } catch (err) {
           console.warn("Barrel update skipped:", err instanceof Error ? err.message : String(err));
         }
 
-        // === Manifest update ===
+        // === Manifest update (atomic write with uniqueness) ===
         try {
           const manifestPath = path.resolve(process.cwd(), MANIFEST_PATH);
           let manifest: { components: Record<string, string[]> } = { components: {} };
@@ -397,13 +539,19 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
             // will create fresh manifest
           }
 
-          const section = manifest.components;
-          const list = (section[kind] ||= []);
-          if (!list.includes(leaf)) list.push(leaf);
-          list.sort((a, b) => a.localeCompare(b));
+          // Use Set to maintain uniqueness per group
+          const list = new Set(manifest.components[kind] ?? []);
+          list.add(leaf);
+          manifest.components[kind] = [...list].sort((a, b) => a.localeCompare(b));
 
+          // Atomic write: write to temp file then rename
           await fs.mkdir(path.dirname(manifestPath), { recursive: true });
-          await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+          const tmpPath = manifestPath + ".tmp";
+          await fs.writeFile(tmpPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+          await fs.rename(tmpPath, manifestPath);
+          if (program.opts().verbose) {
+            console.log(`ℹ️  Updated manifest: added ${leaf} to ${kind} group`);
+          }
           console.log("Updated .nextforge/manifest.json");
         } catch (err) {
           console.warn(
@@ -415,6 +563,8 @@ export const Primary: StoryObj<typeof ${leaf}> = { args: {} };
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`add:component failed: ${msg}`);
         process.exitCode = 1;
+        // Rethrow so tests can catch the error
+        throw err;
       }
     });
 }
