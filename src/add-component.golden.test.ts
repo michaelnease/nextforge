@@ -10,6 +10,10 @@ import { registerAddComponent } from "./commands/add/component.js";
 async function runCLI(args: string[]) {
   const program = new Command().name("nextforge");
   registerAddComponent(program);
+  // Configure to throw errors instead of exiting
+  program.exitOverride();
+  // Suppress output during tests
+  program.configureOutput({ outputError: () => {} });
   await program.parseAsync(args, { from: "user" });
 }
 
@@ -109,5 +113,143 @@ describe("add:component", () => {
 
     const manifest = JSON.parse(await readText(".nextforge/manifest.json"));
     expect(Array.isArray(manifest.components.section)).toBe(true);
+  });
+
+  it("creates Chakra component with client directive", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: true, useTailwind: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Card", "--group", "ui", "--client", "--app", "app"]);
+
+    const text = await readText("app/components/ui/Card/Card.tsx");
+    expect(text.startsWith('"use client"')).toBe(true);
+    expect(text).toMatch(/import { Box, Heading, Text } from "@chakra-ui\/react"/);
+  });
+
+  it("tailwind path no css module by default", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: false, useTailwind: true, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Badge", "--group", "ui", "--with-style", "--app", "app"]);
+
+    const cssExists = await fs
+      .access("app/components/ui/Badge/Badge.module.css")
+      .then(() => true)
+      .catch(() => false);
+    expect(cssExists).toBe(false);
+  });
+
+  it("creates CSS module when Tailwind is disabled", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: false, useTailwind: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Badge", "--group", "ui", "--with-style", "--app", "app"]);
+
+    const css = await readText("app/components/ui/Badge/Badge.module.css");
+    expect(css).toContain(".container");
+  });
+
+  it("creates Chakra style file when Chakra is enabled", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: true, useTailwind: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Card", "--group", "ui", "--with-style", "--app", "app"]);
+
+    const styles = await readText("app/components/ui/Card/Card.styles.ts");
+    expect(styles).toContain("SystemStyleObject");
+    expect(styles).toContain("CardStyles");
+  });
+
+  it("validates invalid group", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await expect(
+      runCLI(["add:component", "Button", "--group", "invalid", "--app", "app"])
+    ).rejects.toThrow(/Invalid --group/);
+  });
+
+  it("validates invalid component name starting with number", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await expect(
+      runCLI(["add:component", "123Button", "--group", "ui", "--app", "app"])
+    ).rejects.toThrow(/Invalid component name/);
+  });
+
+  it("respects --force flag", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    const first = await readText("app/components/ui/Button/Button.tsx");
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app", "--force"]);
+    const second = await readText("app/components/ui/Button/Button.tsx");
+
+    expect(first).toBe(second); // Should be overwritten (same template)
+  });
+
+  it("creates server component by default (no client directive)", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+
+    const text = await readText("app/components/ui/Button/Button.tsx");
+    expect(text.startsWith('"use client"')).toBe(false);
+  });
+
+  it("creates all group types correctly", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    for (const group of ["ui", "layout", "section", "feature"]) {
+      await runCLI(["add:component", `Test${group}`, "--group", group, "--app", "app"]);
+      const exists = await fs
+        .access(`app/components/${group}/Test${group}/Test${group}.tsx`)
+        .then(() => true)
+        .catch(() => false);
+      expect(exists).toBe(true);
+    }
+  });
+
+  it("handles missing app directory", async () => {
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "missing/app" }, null, 2)
+    );
+
+    await expect(
+      runCLI(["add:component", "Button", "--group", "ui", "--app", "app"])
+    ).rejects.toThrow(/App directory not found/);
   });
 });
