@@ -347,4 +347,19 @@ describe("add:component", () => {
     expect(component.endsWith("\n")).toBe(true);
     expect(index.endsWith("\n")).toBe(true);
   });
+
+  it("barrel exports use POSIX paths (Windows compatibility)", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+
+    const barrel = await readText("app/components/ui/index.ts");
+    // POSIX paths use forward slashes, even on Windows
+    expect(barrel).not.toContain("\\");
+    expect(barrel).toMatch(/export.*from.*["'].*Button.*Button["']/);
+  });
 });
