@@ -608,21 +608,56 @@ This project uses:
 - **Vitest** for testing
 - **ESLint** and **Prettier** for code quality
 - **ESM-only** modules (Node 18.18.0+)
+- **pnpm** for package management
+
+### Quick Start for Contributors
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build the project
+pnpm build
+
+# Type check
+pnpm typecheck
+
+# Run linter
+pnpm lint
+
+# Run tests
+pnpm test -- --run
+
+# Run smoke tests
+pnpm smoke
+
+# Format code
+pnpm format
+
+# Run all verification checks
+pnpm verify
+```
 
 ### Setup
 
 ```bash
 # Install dependencies
 npm install
+# or
+pnpm install
 
 # Run all checks (recommended)
 npm run verify
+# or
+pnpm verify
 
 # Or run individual commands
 npm run build    # Build the project
-npm test         # Run tests
+npm test         # Run tests (watch mode)
+npm run test:run # Run tests once
 npm run lint     # Run linting
 npm run format   # Format code
+npm run smoke    # Run smoke tests
 ```
 
 ### Local Development
