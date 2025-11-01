@@ -252,4 +252,51 @@ describe("add:component", () => {
       runCLI(["add:component", "Button", "--group", "ui", "--app", "app"])
     ).rejects.toThrow(/App directory not found/);
   });
+
+  it("creates Storybook story with correct format", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Card", "--group", "ui", "--with-story", "--app", "app"]);
+
+    const story = await readText("app/components/ui/Card/Card.stories.tsx");
+    expect(story).toContain('title: "components/ui/Card"');
+    expect(story).toContain("satisfies Meta");
+    expect(story).toContain("type Story = StoryObj<typeof meta>");
+    expect(story).toContain("export const Primary: Story");
+  });
+
+  it("maintains manifest uniqueness", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+
+    const manifest = JSON.parse(await readText(".nextforge/manifest.json"));
+    expect(manifest.components.ui).toEqual(["Button"]);
+    expect(manifest.components.ui.length).toBe(1);
+  });
+
+  it("tailwind with --with-style skips CSS module", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: false, useTailwind: true, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Badge", "--group", "ui", "--with-style", "--app", "app"]);
+
+    const cssExists = await fs
+      .access("app/components/ui/Badge/Badge.module.css")
+      .then(() => true)
+      .catch(() => false);
+    expect(cssExists).toBe(false);
+  });
 });
