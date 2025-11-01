@@ -27,9 +27,9 @@ function assertFileExists(filePath, description) {
     });
 }
 
-async function testConfig(name, config, variantDir) {
+async function testConfig(name, config, variantDir, repoRoot) {
   console.log(`\n📦 Testing ${name} config...`);
-  const binPath = path.resolve(process.cwd(), "bin", "nextforge.js");
+  const cli = path.join(repoRoot, "bin", "nextforge.js");
 
   await fs.writeFile(
     path.join(variantDir, "nextforge.config.json"),
@@ -38,7 +38,7 @@ async function testConfig(name, config, variantDir) {
   await fs.mkdir(path.join(variantDir, "app"), { recursive: true });
 
   const args = [
-    binPath,
+    cli,
     "add:component",
     "Button",
     "--group",
@@ -87,6 +87,18 @@ async function testConfig(name, config, variantDir) {
 }
 
 async function main() {
+  const repoRoot = process.cwd();
+
+  // Build the project first
+  console.log("🔨 Building project...");
+  try {
+    await run("pnpm", ["build"], { cwd: repoRoot });
+  } catch (err) {
+    // Fallback to npm if pnpm fails
+    await run("npm", ["run", "build"], { cwd: repoRoot });
+  }
+  console.log("✓ Build complete\n");
+
   const tmpBase = await fs.mkdtemp(path.join(os.tmpdir(), "nextforge-smoke-"));
   console.log("Temp workspace base:", tmpBase);
 
@@ -97,18 +109,29 @@ async function main() {
     await testConfig(
       "Tailwind",
       { useTailwind: true, useChakra: false, pagesDir: "app" },
-      tailwindDir
+      tailwindDir,
+      repoRoot
     );
 
     // Test Chakra variant
     const chakraDir = path.join(tmpBase, "chakra");
     await fs.mkdir(chakraDir, { recursive: true });
-    await testConfig("Chakra", { useTailwind: false, useChakra: true, pagesDir: "app" }, chakraDir);
+    await testConfig(
+      "Chakra",
+      { useTailwind: false, useChakra: true, pagesDir: "app" },
+      chakraDir,
+      repoRoot
+    );
 
     // Test both-on variant
     const bothDir = path.join(tmpBase, "both");
     await fs.mkdir(bothDir, { recursive: true });
-    await testConfig("Both", { useTailwind: true, useChakra: true, pagesDir: "app" }, bothDir);
+    await testConfig(
+      "Both",
+      { useTailwind: true, useChakra: true, pagesDir: "app" },
+      bothDir,
+      repoRoot
+    );
 
     console.log("\n✅ All smoke tests passed!");
   } catch (err) {

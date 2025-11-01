@@ -314,6 +314,11 @@ describe("add:component", () => {
     expect(code).toContain("Box");
   });
 
+  // Template existence verified by existing tests:
+  // - "creates a Tailwind UI component" verifies tplTailwind
+  // - "creates Chakra component with client directive" verifies tplChakra
+  // - "both Chakra and Tailwind flags uses ChakraTailwind template" verifies tplChakraTailwind
+
   it("barrel export is idempotent (no duplicates on second run)", async () => {
     await fs.mkdir("app", { recursive: true });
     await fs.writeFile(
@@ -408,9 +413,8 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Counter", "--group", "ui", "--client", "--app", "app"]);
 
-    const code = await readText("app/components/ui/Counter/Counter.tsx");
-    const firstLine = code.split("\n")[0];
-    expect(firstLine).toBe('"use client"');
+    const txt = await readText("app/components/ui/Counter/Counter.tsx");
+    expect(txt.split(/\r?\n/, 1)[0]).toBe('"use client"');
   });
 
   it("force overwrite replaces files only with --force", async () => {
