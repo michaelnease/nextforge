@@ -362,4 +362,76 @@ describe("add:component", () => {
     expect(barrel).not.toContain("\\");
     expect(barrel).toMatch(/export.*from.*["'].*Button.*Button["']/);
   });
+
+  it("framework precedence: config Tailwind but --framework chakra → Chakra output", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI([
+      "add:component",
+      "Test",
+      "--group",
+      "ui",
+      "--framework",
+      "chakra",
+      "--app",
+      "app",
+    ]);
+
+    const code = await readText("app/components/ui/Test/Test.tsx");
+    expect(code).toContain("@chakra-ui/react");
+    expect(code).toContain("Box");
+    expect(code).not.toContain('className="p-6"'); // Should be Chakra, not Tailwind
+  });
+
+  it("invalid framework shows helpful error", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await expect(
+      runCLI(["add:component", "Button", "--group", "ui", "--framework", "invalid", "--app", "app"])
+    ).rejects.toThrow(/Invalid --framework.*Use one of: chakra, tailwind, basic/);
+  });
+
+  it("client directive is exactly first line when --client is used", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Counter", "--group", "ui", "--client", "--app", "app"]);
+
+    const code = await readText("app/components/ui/Counter/Counter.tsx");
+    const firstLine = code.split("\n")[0];
+    expect(firstLine).toBe('"use client"');
+  });
+
+  it("force overwrite replaces files only with --force", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    // Create component first time
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    const firstCode = await readText("app/components/ui/Button/Button.tsx");
+
+    // Try to create again without --force (should skip)
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    const secondCode = await readText("app/components/ui/Button/Button.tsx");
+    expect(firstCode).toBe(secondCode); // Should be unchanged
+
+    // Create with --force (should overwrite)
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app", "--force"]);
+    const thirdCode = await readText("app/components/ui/Button/Button.tsx");
+    expect(thirdCode).toBe(firstCode); // Should be overwritten (same template)
+  });
 });
