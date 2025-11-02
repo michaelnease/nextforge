@@ -16,7 +16,7 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 - **ESLint + Prettier** for code quality
 - **Vitest** for fast testing
 - **TypeScript declarations** for library consumers
-- **Comprehensive CI/CD** with GitHub Actions
+- **Comprehensive CI/CD** with GitHub Actions (see `.github/workflows/ci.yml`)
 
 ### 📦 **Built-in Utilities**
 
@@ -183,7 +183,7 @@ Components are organized into four groups, each placed in a specific directory:
 
 - `--group <type>` - Component group: `ui` | `layout` | `section` | `feature` (default: `ui`)
 - `--app <dir>` - App directory (default: `app`)
-- `--framework <name>` - Override template: `chakra` | `tailwind` | `basic` | `both`
+- `--framework <name>` - Override template: `chakra` | `tailwind` | `basic` | `both` (takes precedence over `nextforge.config.json`)
 - `--client` - Add `"use client"` directive for client components (default: server component)
 - `--with-tests` - Create a Vitest test file (`Component.test.tsx`)
 - `--with-style` - Create a style file (`.styles.ts` for Chakra, `.module.css` for basic, skipped for Tailwind)
@@ -218,6 +218,29 @@ export default function Counter({ title, subtitle }: CounterProps) {
   // ...
 }
 ```
+
+#### Framework Selection
+
+The framework template is chosen based on this precedence:
+
+1. **`--framework` flag** (highest precedence) - Explicitly override template
+2. **`nextforge.config.json`** - Project-wide configuration
+3. **Default** - Basic template if no framework detected
+
+**Examples:**
+
+```bash
+# Override config to use Tailwind
+nextforge add:component Button --group ui --framework tailwind
+
+# Use Chakra with client directive and tests
+nextforge add:component Counter --group ui --framework chakra --client --with-tests
+
+# Both frameworks (Chakra + Tailwind utilities)
+nextforge add:component Hybrid --group ui --framework both
+```
+
+**Note:** When `--framework tailwind` or `useTailwind: true` is active, `--with-style` skips CSS module creation. Use Tailwind utility classes instead.
 
 #### Style File Generation
 
@@ -303,6 +326,23 @@ export default function Shell({ children }: ShellProps) {
 #### Manifest File
 
 NextForge maintains a `.nextforge/manifest.json` file that tracks all generated components. This file is automatically updated when components are created and uses atomic writes to prevent corruption during concurrent runs.
+
+**Manifest Structure:**
+
+The manifest stores component **names** (not paths) grouped by component type:
+
+```json
+{
+  "components": {
+    "ui": ["Button", "Card", "Input"],
+    "layout": ["Shell", "Container"],
+    "section": ["Hero", "Features"],
+    "feature": ["Auth", "Dashboard"]
+  }
+}
+```
+
+**Design Decision:** The manifest uses component names per group rather than full paths. This keeps the manifest simple for UI menus and component listings, but means components with the same name in different subfolders will appear as duplicates. If you need globally unique tracking, use the actual file system structure or external tooling.
 
 #### Barrel Exports
 
@@ -608,21 +648,56 @@ This project uses:
 - **Vitest** for testing
 - **ESLint** and **Prettier** for code quality
 - **ESM-only** modules (Node 18.18.0+)
+- **pnpm** for package management
+
+### Quick Start for Contributors
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build the project
+pnpm build
+
+# Type check
+pnpm typecheck
+
+# Run linter
+pnpm lint
+
+# Run tests
+pnpm test -- --run
+
+# Run smoke tests
+pnpm smoke
+
+# Format code
+pnpm format
+
+# Run all verification checks
+pnpm verify
+```
 
 ### Setup
 
 ```bash
 # Install dependencies
 npm install
+# or
+pnpm install
 
 # Run all checks (recommended)
 npm run verify
+# or
+pnpm verify
 
 # Or run individual commands
 npm run build    # Build the project
-npm test         # Run tests
+npm test         # Run tests (watch mode)
+npm run test:run # Run tests once
 npm run lint     # Run linting
 npm run format   # Format code
+npm run smoke    # Run smoke tests
 ```
 
 ### Local Development

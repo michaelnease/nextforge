@@ -318,7 +318,10 @@ export function registerAddComponent(program: Command) {
     .argument("<name>", "Component name, e.g. Button or marketing/Hero")
     .option("--group <type>", "Component group: ui | layout | section | feature", "ui")
     .option("--app <dir>", "App directory (default: app)", "app")
-    .option("--framework <name>", "Override template: chakra | tailwind | basic | both")
+    .option(
+      "--framework <name>",
+      "Override template: chakra | tailwind | basic (takes precedence over config)"
+    )
     .option("--client", "Mark as a client component", false)
     .option("--with-tests", "Create a basic test file", false)
     .option("--with-style", "Create a CSS or Chakra style file", false)
@@ -342,19 +345,15 @@ export function registerAddComponent(program: Command) {
         const subdirs = parts.map(toPascalCase);
 
         const fileCfg = await loadConfig({ verbose: !!program.opts().verbose });
-        const fw = (opts.framework ?? "").toString().toLowerCase().trim();
-        const validFrameworks = new Set([
-          "",
-          "chakra",
-          "tailwind",
-          "basic",
-          "both",
-          "chakra+tailwind",
-          "tailwind+chakra",
-        ]);
-        if (!validFrameworks.has(fw)) {
-          throw new Error(`Invalid --framework "${fw}". Use chakra | tailwind | basic | both.`);
+        // Validate --framework flag if provided
+        const allowed = ["chakra", "tailwind", "basic", "both"] as const;
+        const fw = opts.framework ? String(opts.framework).toLowerCase().trim() : undefined;
+        if (fw && !allowed.includes(fw as (typeof allowed)[number])) {
+          throw new Error(
+            `Invalid --framework "${opts.framework}". Use one of: ${allowed.join(", ")}`
+          );
         }
+        // Framework override: --framework takes precedence over config
         const fwOverride =
           fw === "chakra"
             ? { useChakra: true, useTailwind: false }
@@ -362,7 +361,7 @@ export function registerAddComponent(program: Command) {
               ? { useChakra: false, useTailwind: true }
               : fw === "basic"
                 ? { useChakra: false, useTailwind: false }
-                : fw === "both" || fw === "chakra+tailwind" || fw === "tailwind+chakra"
+                : fw === "both"
                   ? { useChakra: true, useTailwind: true }
                   : {};
         const flagsCfg = {
@@ -374,6 +373,10 @@ export function registerAddComponent(program: Command) {
           env: process.env,
           flags: flagsCfg as Partial<Record<string, unknown>>,
         });
+
+        if (program.opts().verbose && fw) {
+          console.log(`ℹ️  Framework override: ${fw} (overrides config)`);
+        }
 
         const baseDir = path.resolve(process.cwd(), config.pagesDir);
         // Verify app directory exists
@@ -406,7 +409,9 @@ export function registerAddComponent(program: Command) {
                 : config.useTailwind
                   ? "Tailwind"
                   : "Basic";
+          console.log(`ℹ️  Resolved framework: ${fw || "from config"}`);
           console.log(`ℹ️  Template: ${templateType}, Client: ${isClient}`);
+          console.log(`ℹ️  App directory: ${config.pagesDir}`);
           console.log(`ℹ️  Component path: ${path.relative(process.cwd(), componentPath)}`);
           console.log(`ℹ️  Group: ${kind}`);
         }
@@ -455,7 +460,7 @@ export const ${leaf}Styles: SystemStyleObject = {
 };
 `;
             await writeIfAbsent(stylePath, styleCode, !!opts.force);
-          } else if (config.useTailwind) {
+          } else if (fw === "tailwind" || config.useTailwind) {
             // Tailwind detected - skip CSS Module creation (even with --with-style)
             if (program.opts().verbose) {
               console.log(
@@ -539,7 +544,7 @@ export const Primary: Story = { args: {} };
             // will create fresh manifest
           }
 
-          // Use Set to maintain uniqueness per group
+          // Use Set to maintain uniqueness per group (stores component name, not path)
           const list = new Set(manifest.components[kind] ?? []);
           list.add(leaf);
           manifest.components[kind] = [...list].sort((a, b) => a.localeCompare(b));
