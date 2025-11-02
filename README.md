@@ -2,6 +2,48 @@
 
 A modern CLI tool for Next.js project scaffolding and management, built with TypeScript and ESM.
 
+## 📚 Documentation
+
+- **[Changelog](docs/CHANGELOG.md)** - Version history and release notes
+- **[Contributor Guide](docs/FOR_AI.md)** - Editing guide for contributors and AI assistants
+- **[License](docs/LICENSE)** - MIT License
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+  - [Modern CLI Architecture](#-modern-cli-architecture)
+  - [Development Tools](#-development-tools)
+  - [Built-in Utilities](#-built-in-utilities)
+  - [Developer Experience](#-developer-experience)
+  - [Project Management](#-project-management)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [CLI Commands](#cli-commands)
+  - [Page and API Route Generation](#page-and-api-route-generation)
+  - [Project-wide Configuration](#project-wide-configuration)
+  - [Component Generation](#component-generation)
+  - [Route Group Generation](#route-group-generation)
+- [Development](#development)
+  - [Quick Start for Contributors](#quick-start-for-contributors)
+  - [Setup](#setup)
+  - [Local Development](#local-development)
+  - [Project Structure](#project-structure)
+  - [Development Commands](#development-commands)
+  - [Git Hooks](#git-hooks)
+  - [Utility Scripts](#utility-scripts)
+- [Technical Specifications](#technical-specifications)
+  - [Runtime Requirements](#runtime-requirements)
+  - [Build Output](#build-output)
+  - [Code Quality](#code-quality)
+  - [Testing & CI](#testing--ci)
+- [Requirements](#requirements)
+- [License](#license)
+
+---
+
 ## Features
 
 ### 🏗️ **Modern CLI Architecture**
@@ -588,57 +630,6 @@ export default async function Page() {
 }
 ```
 
-### Development Commands
-
-```bash
-# Run all quality checks
-npm run verify
-
-# Development with hot reload
-npm run dev
-
-# Build and test
-npm run build && npm test
-
-# Format and lint
-npm run format && npm run lint:fix
-```
-
-### Git Hooks
-
-This project uses **Husky** to ensure code quality before commits and pushes:
-
-- **Pre-commit hook**: Runs `npm run verify` before each commit
-- **Pre-push hook**: Runs `npm run verify` before pushing to GitHub
-
-The hooks will prevent commits/pushes if:
-
-- ESLint finds any issues
-- Prettier formatting is incorrect
-- TypeScript compilation fails
-- Tests fail
-- CLI smoke tests fail
-
-To bypass hooks (not recommended):
-
-```bash
-git commit --no-verify -m "message"
-git push --no-verify
-```
-
-### Utility Scripts
-
-```bash
-# Create PR diff zip
-npm run zip:pr
-
-# Test specific commit range
-npm run zip:pr -- --base HEAD~5 --head HEAD
-
-# Since last tag
-npm run zip:pr -- --since $(git describe --tags --abbrev=0)
-```
-
 ## Development
 
 This project uses:
@@ -651,6 +642,8 @@ This project uses:
 - **pnpm** for package management
 
 ### Quick Start for Contributors
+
+> 📖 **Contributing?** See the [Contributor Guide](docs/FOR_AI.md) for detailed editing guidelines, file structure conventions, and development patterns.
 
 ```bash
 # Install dependencies
@@ -737,6 +730,57 @@ src/
     └── README-zip-pr-diff.md  # Zipper documentation
 ```
 
+### Development Commands
+
+```bash
+# Run all quality checks
+npm run verify
+
+# Development with hot reload
+npm run dev
+
+# Build and test
+npm run build && npm test
+
+# Format and lint
+npm run format && npm run lint:fix
+```
+
+### Git Hooks
+
+This project uses **Husky** to ensure code quality before commits and pushes:
+
+- **Pre-commit hook**: Runs `npm run verify` before each commit
+- **Pre-push hook**: Runs `npm run verify` before pushing to GitHub
+
+The hooks will prevent commits/pushes if:
+
+- ESLint finds any issues
+- Prettier formatting is incorrect
+- TypeScript compilation fails
+- Tests fail
+- CLI smoke tests fail
+
+To bypass hooks (not recommended):
+
+```bash
+git commit --no-verify -m "message"
+git push --no-verify
+```
+
+### Utility Scripts
+
+```bash
+# Create PR diff zip
+npm run zip:pr
+
+# Test specific commit range
+npm run zip:pr -- --base HEAD~5 --head HEAD
+
+# Since last tag
+npm run zip:pr -- --since $(git describe --tags --abbrev=0)
+```
+
 ## Technical Specifications
 
 ### Runtime Requirements
@@ -773,4 +817,4 @@ src/
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](docs/LICENSE) file for details.
