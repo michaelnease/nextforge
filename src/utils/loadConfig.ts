@@ -37,22 +37,60 @@ async function tryLoadModule(file: string): Promise<unknown | undefined> {
 
   if (file.endsWith(".ts")) {
     try {
-      // Be tolerant of tsx versions/paths
-      // Dynamic import - tsx may not be available at compile time
+      // Try several tsx programmatic API entrypoints
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let tsxAny: any;
       const tsxPath1 = "tsx/esm/api.js";
       const tsxPath2 = "tsx/esm/api";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tsxAny: any = await import(tsxPath1).catch(() => import(tsxPath2));
-      const loadFile = tsxAny.loadFile ?? tsxAny.default?.loadFile;
-      if (!loadFile) throw new Error("tsx loadFile API not found");
-      const ns = await loadFile(pathToFileURL(file));
-      return getModuleDefault(ns);
+      const tsxPath3 = "tsx";
+      try {
+        // eslint-disable-next-line import/no-unresolved
+        tsxAny = await import(tsxPath1);
+      } catch {
+        try {
+          // eslint-disable-next-line import/no-unresolved
+          tsxAny = await import(tsxPath2);
+        } catch {
+          // eslint-disable-next-line import/no-unresolved
+          tsxAny = await import(tsxPath3); // some versions export helpers on default
+        }
+      }
+
+      const loadFile = tsxAny?.loadFile ?? tsxAny?.default?.loadFile ?? tsxAny?.api?.loadFile;
+
+      if (typeof loadFile === "function") {
+        const ns = await loadFile(pathToFileURL(file));
+        return getModuleDefault(ns);
+      }
+
+      // Fallback: transpile with esbuild and import the result as ESM
+      const esbuildPath = "esbuild";
+      // eslint-disable-next-line import/no-unresolved
+      const { transform } = await import(esbuildPath);
+      const src = await fs.readFile(file, "utf8");
+      const { code } = await transform(src, {
+        loader: "ts",
+        format: "esm",
+        sourcemap: false,
+        target: "es2022",
+      });
+
+      const tmp = path.join(
+        process.cwd(),
+        ".nextforge",
+        "tmp",
+        `nf-${Date.now()}-${path.basename(file, ".ts")}.mjs`
+      );
+      await fs.mkdir(path.dirname(tmp), { recursive: true });
+      await fs.writeFile(tmp, code, "utf8");
+      const mod = await import(pathToFileURL(tmp).href);
+      return getModuleDefault(mod);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `Failed to load ${path.basename(file)}. TypeScript configs require 'tsx' as a dependency. ` +
-          `Alternatively rename to nextforge.config.mjs or add "type":"module" to package.json. ` +
-          `Underlying error: ${message}`
+        `Failed to load ${path.basename(file)}. ` +
+          `Install 'tsx' (dev dep) or rename to nextforge.config.mjs, ` +
+          `or add "type":"module" to package.json. Underlying error: ${message}`
       );
     }
   }
