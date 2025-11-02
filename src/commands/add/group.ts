@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+import { mkdir, access, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Command } from "commander";
@@ -24,14 +24,22 @@ function normalizeGroupName(input: string) {
 }
 
 async function ensureDir(dir: string) {
-  await fs.mkdir(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
 }
 
-async function assertDirExists(dir: string) {
+async function ensureAppDir(appDir: string, verbose = false) {
   try {
-    await fs.access(dir);
+    await access(appDir);
   } catch {
-    throw new Error(`App directory not found: ${dir}`);
+    // Safety: don't auto-create if the path includes traversal segments
+    const parts = appDir.split(path.sep);
+    if (parts.some((p) => p === "." || p === "..")) {
+      throw new Error(`Refusing to create unsafe app directory: ${appDir}`);
+    }
+    await mkdir(appDir, { recursive: true });
+    if (verbose) {
+      console.log(`Created missing app directory: ${path.relative(process.cwd(), appDir)}`);
+    }
   }
 }
 
@@ -41,13 +49,13 @@ async function assertDirExists(dir: string) {
 async function writeIfAbsent(filePath: string, contents: string, force = false) {
   if (!force) {
     try {
-      await fs.access(filePath);
+      await access(filePath);
       return; // exists, do not overwrite
     } catch {
       // not found, fall through to write
     }
   }
-  await fs.writeFile(filePath, contents, "utf8");
+  await writeFile(filePath, contents, "utf8");
 }
 
 // [nextforge.templates:layout:start]
@@ -159,6 +167,13 @@ export function registerAddGroup(program: Command) {
     )
     .action(async (name, opts) => {
       try {
+        // Safety: check for traversal segments in the raw input BEFORE any processing
+        const rawAppPath = opts.app;
+        const pathParts = rawAppPath.split(/[/\\]/);
+        if (pathParts.some((p: string) => p === "." || p === "..")) {
+          throw new Error(`Refusing to create unsafe app directory: ${rawAppPath}`);
+        }
+
         const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
         const flagsCfg = { pagesDir: opts.app };
         const config = mergeConfig({ fileConfig: fileCfg, env: process.env, flags: flagsCfg });
@@ -166,7 +181,7 @@ export function registerAddGroup(program: Command) {
         const appDir = path.resolve(process.cwd(), config.pagesDir);
         const groupDir = path.join(appDir, group);
 
-        await assertDirExists(appDir);
+        await ensureAppDir(appDir, Boolean(program.opts().verbose));
         await ensureDir(groupDir);
 
         if (opts.withLayout) {
@@ -219,6 +234,8 @@ export function registerAddGroup(program: Command) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`add:group failed: ${msg}`);
         process.exitCode = 1;
+        // Rethrow so commander's exitOverride can handle it in tests
+        throw err;
       }
     });
 }
