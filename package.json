@@ -34,6 +34,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:watch": "vitest",
+    "smoke": "node scripts/smoke-add-component.mjs",
     "smoke:add-component": "node scripts/smoke-add-component.mjs",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",

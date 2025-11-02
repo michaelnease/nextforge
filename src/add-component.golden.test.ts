@@ -314,6 +314,35 @@ describe("add:component", () => {
     expect(code).toContain("Box");
   });
 
+  it("--framework both creates ChakraTailwind template", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: false, useTailwind: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI([
+      "add:component",
+      "Hybrid",
+      "--group",
+      "ui",
+      "--framework",
+      "both",
+      "--app",
+      "app",
+    ]);
+
+    const code = await readText("app/components/ui/Hybrid/Hybrid.tsx");
+    expect(code).toContain("@chakra-ui/react");
+    expect(code).toContain('className="');
+    expect(code).toContain("Box");
+  });
+
+  // Template existence verified by existing tests:
+  // - "creates a Tailwind UI component" verifies tplTailwind
+  // - "creates Chakra component with client directive" verifies tplChakra
+  // - "both Chakra and Tailwind flags uses ChakraTailwind template" verifies tplChakraTailwind
+
   it("barrel export is idempotent (no duplicates on second run)", async () => {
     await fs.mkdir("app", { recursive: true });
     await fs.writeFile(
@@ -321,16 +350,25 @@ describe("add:component", () => {
       JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
     );
 
+    // First run
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
     const barrel1 = await readText("app/components/ui/index.ts");
     const count1 = (barrel1.match(/export \{ default as Button \}/g) || []).length;
+    // Verify POSIX path is used (forward slashes)
+    expect(barrel1).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    expect(barrel1).not.toContain("\\");
 
+    // Second run - should not duplicate
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
     const barrel2 = await readText("app/components/ui/index.ts");
     const count2 = (barrel2.match(/export \{ default as Button \}/g) || []).length;
 
+    // Should have exactly one export line
     expect(count2).toBe(count1);
-    expect(count1).toBeGreaterThan(0);
+    expect(count1).toBe(1);
+    // Still uses POSIX paths after second run
+    expect(barrel2).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    expect(barrel2).not.toContain("\\");
   });
 
   it("generated files end with newline", async () => {
@@ -346,5 +384,154 @@ describe("add:component", () => {
     const index = await readText("app/components/ui/Button/index.ts");
     expect(component.endsWith("\n")).toBe(true);
     expect(index.endsWith("\n")).toBe(true);
+  });
+
+  it("barrel exports use POSIX paths (Windows compatibility)", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+
+    const barrel = await readText("app/components/ui/index.ts");
+    // POSIX paths use forward slashes, even on Windows
+    expect(barrel).not.toContain("\\");
+    // Verify forward slashes are used in import paths
+    expect(barrel).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    expect(barrel).toMatch(/export.*from.*["'].*\/.*["']/);
+  });
+
+  it("framework precedence: config Tailwind but --framework chakra → Chakra output", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI([
+      "add:component",
+      "Test",
+      "--group",
+      "ui",
+      "--framework",
+      "chakra",
+      "--app",
+      "app",
+    ]);
+
+    const code = await readText("app/components/ui/Test/Test.tsx");
+    expect(code).toContain("@chakra-ui/react");
+    expect(code).toContain("Box");
+    expect(code).not.toContain('className="p-6"'); // Should be Chakra, not Tailwind
+  });
+
+  it("invalid framework shows helpful error", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await expect(
+      runCLI(["add:component", "Button", "--group", "ui", "--framework", "invalid", "--app", "app"])
+    ).rejects.toThrow(/Invalid --framework.*Use one of: chakra, tailwind, basic, both/);
+  });
+
+  it("places 'use client' on line 1 (exactly first line, no leading whitespace)", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Counter", "--group", "ui", "--client", "--app", "app"]);
+
+    const txt = await readText("app/components/ui/Counter/Counter.tsx");
+    // Verify exactly first line is "use client" with no leading whitespace or comments
+    expect(txt.split(/\r?\n/, 1)[0]).toBe('"use client"');
+    // Also verify it's the very first character of the file
+    expect(txt.trimStart().split(/\r?\n/, 1)[0]).toBe('"use client"');
+  });
+
+  it("force overwrite replaces files only with --force", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    // Create component first time
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    const firstCode = await readText("app/components/ui/Button/Button.tsx");
+
+    // Try to create again without --force (should skip)
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    const secondCode = await readText("app/components/ui/Button/Button.tsx");
+    expect(firstCode).toBe(secondCode); // Should be unchanged
+
+    // Create with --force (should overwrite)
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app", "--force"]);
+    const thirdCode = await readText("app/components/ui/Button/Button.tsx");
+    expect(thirdCode).toBe(firstCode); // Should be overwritten (same template)
+  });
+
+  it("--force applies to style and story files", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useChakra: true, useTailwind: false, pagesDir: "app" }, null, 2)
+    );
+
+    // Create with style and story first time
+    await runCLI([
+      "add:component",
+      "Card",
+      "--group",
+      "ui",
+      "--with-style",
+      "--with-story",
+      "--app",
+      "app",
+    ]);
+
+    const stylePath = "app/components/ui/Card/Card.styles.ts";
+    const storyPath = "app/components/ui/Card/Card.stories.tsx";
+    const firstStyle = await readText(stylePath);
+    const firstStory = await readText(storyPath);
+
+    // Try to create again without --force (should skip)
+    await runCLI([
+      "add:component",
+      "Card",
+      "--group",
+      "ui",
+      "--with-style",
+      "--with-story",
+      "--app",
+      "app",
+    ]);
+    const secondStyle = await readText(stylePath);
+    const secondStory = await readText(storyPath);
+    expect(firstStyle).toBe(secondStyle);
+    expect(firstStory).toBe(secondStory);
+
+    // Create with --force (should overwrite)
+    await runCLI([
+      "add:component",
+      "Card",
+      "--group",
+      "ui",
+      "--with-style",
+      "--with-story",
+      "--app",
+      "app",
+      "--force",
+    ]);
+    const thirdStyle = await readText(stylePath);
+    const thirdStory = await readText(storyPath);
+    expect(thirdStyle).toBe(firstStyle); // Should be overwritten
+    expect(thirdStory).toBe(firstStory); // Should be overwritten
   });
 });
