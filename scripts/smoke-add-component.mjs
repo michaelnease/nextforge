@@ -29,6 +29,7 @@ function assertFileExists(filePath, description) {
 
 async function testConfig(name, config, variantDir, repoRoot) {
   console.log(`\n📦 Testing ${name} config...`);
+  // Use bin/nextforge.js which loads dist/index.js (the built artifact)
   const cli = path.join(repoRoot, "bin", "nextforge.js");
 
   await fs.writeFile(

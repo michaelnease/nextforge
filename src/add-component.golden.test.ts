@@ -350,16 +350,25 @@ describe("add:component", () => {
       JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
     );
 
+    // First run
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
     const barrel1 = await readText("app/components/ui/index.ts");
     const count1 = (barrel1.match(/export \{ default as Button \}/g) || []).length;
+    // Verify POSIX path is used (forward slashes)
+    expect(barrel1).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    expect(barrel1).not.toContain("\\");
 
+    // Second run - should not duplicate
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
     const barrel2 = await readText("app/components/ui/index.ts");
     const count2 = (barrel2.match(/export \{ default as Button \}/g) || []).length;
 
+    // Should have exactly one export line
     expect(count2).toBe(count1);
-    expect(count1).toBeGreaterThan(0);
+    expect(count1).toBe(1);
+    // Still uses POSIX paths after second run
+    expect(barrel2).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    expect(barrel2).not.toContain("\\");
   });
 
   it("generated files end with newline", async () => {
@@ -430,7 +439,7 @@ describe("add:component", () => {
     ).rejects.toThrow(/Invalid --framework.*Use one of: chakra, tailwind, basic, both/);
   });
 
-  it("places 'use client' on line 1", async () => {
+  it("places 'use client' on line 1 (exactly first line, no leading whitespace)", async () => {
     await fs.mkdir("app", { recursive: true });
     await fs.writeFile(
       "nextforge.config.json",
@@ -440,7 +449,10 @@ describe("add:component", () => {
     await runCLI(["add:component", "Counter", "--group", "ui", "--client", "--app", "app"]);
 
     const txt = await readText("app/components/ui/Counter/Counter.tsx");
+    // Verify exactly first line is "use client" with no leading whitespace or comments
     expect(txt.split(/\r?\n/, 1)[0]).toBe('"use client"');
+    // Also verify it's the very first character of the file
+    expect(txt.trimStart().split(/\r?\n/, 1)[0]).toBe('"use client"');
   });
 
   it("force overwrite replaces files only with --force", async () => {
