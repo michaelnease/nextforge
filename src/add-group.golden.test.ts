@@ -28,13 +28,17 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 describe("add:group", () => {
-  let ws: { dir: string; restore: () => void };
+  let ws: Awaited<ReturnType<typeof makeTempWorkspace>>;
+  let originalCwd: string;
 
   beforeEach(async () => {
     ws = await makeTempWorkspace();
+    originalCwd = process.cwd();
+    process.chdir(ws.dir);
   });
   afterEach(async () => {
-    ws.restore();
+    process.chdir(originalCwd);
+    await ws.cleanup();
   });
 
   it("auto-creates missing --app dir and scaffolds group", async () => {

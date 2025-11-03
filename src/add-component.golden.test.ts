@@ -18,13 +18,17 @@ async function runCLI(args: string[]) {
 }
 
 describe("add:component", () => {
-  let ws: { dir: string; restore: () => void };
+  let ws: Awaited<ReturnType<typeof makeTempWorkspace>>;
+  let originalCwd: string;
 
   beforeEach(async () => {
     ws = await makeTempWorkspace();
+    originalCwd = process.cwd();
+    process.chdir(ws.dir);
   });
   afterEach(async () => {
-    ws.restore();
+    process.chdir(originalCwd);
+    await ws.cleanup();
   });
 
   it("creates a Tailwind UI component using config pagesDir", async () => {
@@ -450,9 +454,9 @@ describe("add:component", () => {
 
     const txt = await readText("app/components/ui/Counter/Counter.tsx");
     // Verify exactly first line is "use client" with no leading whitespace or comments
-    expect(txt.split(/\r?\n/, 1)[0]).toBe('"use client"');
+    expect(txt.split(/\r?\n/, 1)[0]).toBe('"use client";');
     // Also verify it's the very first character of the file
-    expect(txt.trimStart().split(/\r?\n/, 1)[0]).toBe('"use client"');
+    expect(txt.trimStart().split(/\r?\n/, 1)[0]).toBe('"use client";');
   });
 
   it("force overwrite replaces files only with --force", async () => {

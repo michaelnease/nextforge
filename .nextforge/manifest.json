@@ -1,0 +1,8 @@
+{
+  "components": {
+    "ui": ["Badge", "Button", "Card", "Counter", "Hybrid", "Test", "Testui"],
+    "layout": ["Shell", "Testlayout"],
+    "section": ["Hero", "Testsection"],
+    "feature": ["Testfeature"]
+  }
+}
