@@ -94,7 +94,7 @@ describe("add:cursor", () => {
 
   it("invalid type errors", async () => {
     await expect(runCLI(["add:cursor", "invalid"])).rejects.toThrow(
-      "Invalid cursor type. Use 'rules' or 'phase'."
+      'Invalid --type. Use "rules" or "phase".'
     );
   });
 
@@ -112,15 +112,15 @@ describe("add:cursor", () => {
 
   it("validates phase number is positive", async () => {
     await expect(runCLI(["add:cursor", "phase", "--phase", "0"])).rejects.toThrow(
-      "--phase must be a positive number"
+      "--phase must be a positive integer"
     );
 
     await expect(runCLI(["add:cursor", "phase", "--phase", "-1"])).rejects.toThrow(
-      "--phase must be a positive number"
+      "--phase must be a positive integer"
     );
 
     await expect(runCLI(["add:cursor", "phase", "--phase", "abc"])).rejects.toThrow(
-      "--phase must be a positive number"
+      "--phase must be a positive integer"
     );
   });
 
@@ -151,19 +151,110 @@ describe("add:cursor", () => {
 
       // First creation - should log "write"
       await runCLI(["add:cursor", "rules", "--name", "logging-test"]);
-      expect(logs[logs.length - 1]).toContain("write");
-      expect(logs[logs.length - 1]).toContain(".nextforge/cursor/rules/logging-test.rules.md");
+      expect(
+        logs.some((log) => log.includes("write") && log.includes("logging-test.rules.md"))
+      ).toBe(true);
 
       // Second run without force - should log "skip"
       await runCLI(["add:cursor", "rules", "--name", "logging-test"]);
-      expect(logs[logs.length - 1]).toContain("skip");
-      expect(logs[logs.length - 1]).toContain("(exists)");
+      expect(logs.some((log) => log.includes("skip") && log.includes("(exists)"))).toBe(true);
 
       // Third run with force - should log "force overwrite"
       await runCLI(["add:cursor", "rules", "--name", "logging-test", "--force"]);
-      expect(logs[logs.length - 1]).toContain("force overwrite");
+      expect(logs.some((log) => log.includes("force overwrite"))).toBe(true);
     } finally {
       console.log = originalLog;
     }
+  });
+
+  it("normalizes names to kebab-case", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "My Component Test"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/my-component-test.rules.md");
+    await expect(exists(filePath)).resolves.toBe(true);
+
+    const content = await readText(filePath);
+    expect(content).toContain("Cursor Rules — my-component-test");
+  });
+
+  it("rejects empty names", async () => {
+    await expect(runCLI(["add:cursor", "rules", "--name", ""])).rejects.toThrow(
+      "Name cannot be empty"
+    );
+
+    await expect(runCLI(["add:cursor", "rules", "--name", "   "])).rejects.toThrow(
+      "Name cannot be empty"
+    );
+  });
+
+  it("rejects invalid names with only special characters", async () => {
+    await expect(runCLI(["add:cursor", "rules", "--name", "!!!"])).rejects.toThrow(
+      "Invalid name - must contain at least one alphanumeric character"
+    );
+  });
+
+  it("creates MDX files when --mdx flag is used", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "test-mdx", "--mdx"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/test-mdx.rules.mdx");
+    await expect(exists(filePath)).resolves.toBe(true);
+
+    const content = await readText(filePath);
+    expect(content).toContain("Cursor Rules — test-mdx");
+  });
+
+  it("creates MDX phase files when --mdx flag is used", async () => {
+    await runCLI(["add:cursor", "phase", "--phase", "5", "--mdx"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/phases/phase-5.mdx");
+    await expect(exists(filePath)).resolves.toBe(true);
+
+    const content = await readText(filePath);
+    expect(content).toContain("# Phase 5");
+  });
+
+  it("creates index.json to track generated files", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "test-index"]);
+    await runCLI(["add:cursor", "phase", "--phase", "1"]);
+
+    const indexPath = join(ws.dir, ".nextforge/cursor/index.json");
+    await expect(exists(indexPath)).resolves.toBe(true);
+
+    const indexContent = await readText(indexPath);
+    const index = JSON.parse(indexContent);
+
+    expect(Array.isArray(index)).toBe(true);
+    expect(index.length).toBeGreaterThanOrEqual(2);
+    expect(index.some((item: { type: string }) => item.type === "rules")).toBe(true);
+    expect(index.some((item: { type: string }) => item.type === "phases")).toBe(true);
+  });
+
+  it("updates index.json on duplicate file overwrites", async () => {
+    // Create initial file
+    await runCLI(["add:cursor", "rules", "--name", "duplicate-test"]);
+
+    const indexPath = join(ws.dir, ".nextforge/cursor/index.json");
+    const firstIndex = JSON.parse(await readText(indexPath));
+    const initialLength = firstIndex.length;
+
+    // Overwrite with force
+    await runCLI(["add:cursor", "rules", "--name", "duplicate-test", "--force"]);
+
+    const secondIndex = JSON.parse(await readText(indexPath));
+    // Length should be the same (not duplicated)
+    expect(secondIndex.length).toBe(initialLength);
+  });
+
+  it("uses config cursorDir if specified", async () => {
+    // Create a custom config
+    await writeFile(
+      join(ws.dir, "nextforge.config.json"),
+      JSON.stringify({ cursorDir: ".custom/cursor" }, null, 2)
+    );
+
+    await runCLI(["add:cursor", "rules", "--name", "custom-dir"]);
+
+    const filePath = join(ws.dir, ".custom/cursor/rules/custom-dir.rules.md");
+    await expect(exists(filePath)).resolves.toBe(true);
   });
 });
