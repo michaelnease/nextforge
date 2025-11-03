@@ -12,4 +12,7 @@ if (!main) {
   process.exit(1);
 }
 
-await main();
+main().catch((err) => {
+  console.error(err?.stack || String(err));
+  process.exitCode = 1;
+});

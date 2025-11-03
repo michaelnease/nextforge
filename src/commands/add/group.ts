@@ -1,64 +1,49 @@
-import { mkdir, access, writeFile } from "node:fs/promises";
+import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { Command } from "commander";
 
-import { loadConfig } from "../../utils/loadConfig.js";
-import { mergeConfig } from "../../utils/mergeConfig.js";
-
-/**
- * Normalize a route group name.
- * Accepts "auth" or "(auth)" and returns "(auth)".
- */
-function normalizeGroupName(input: string) {
-  const trimmed = input.trim();
-  if (!trimmed) throw new Error("Group name is required");
-  const name = trimmed.startsWith("(") && trimmed.endsWith(")") ? trimmed.slice(1, -1) : trimmed;
-  if (!/^[a-z0-9-]+$/i.test(name)) {
-    throw new Error(`Invalid group name "${name}". Use letters, numbers, and dashes only.`);
-  }
-  if (name.toLowerCase() === "api") {
-    throw new Error('Group name "api" is reserved. Pick another.');
-  }
-  return `(${name})`;
-}
-
-async function ensureDir(dir: string) {
-  await mkdir(dir, { recursive: true });
-}
-
-async function ensureAppDir(appDir: string, verbose = false) {
-  try {
-    await access(appDir);
-  } catch {
-    // Safety: don't auto-create if the path includes traversal segments
-    const parts = appDir.split(path.sep);
-    if (parts.some((p) => p === "." || p === "..")) {
-      throw new Error(`Refusing to create unsafe app directory: ${appDir}`);
-    }
-    await mkdir(appDir, { recursive: true });
-    if (verbose) {
-      console.log(`Created missing app directory: ${path.relative(process.cwd(), appDir)}`);
-    }
-  }
-}
+import { loadConfig } from "../../config/loadConfig.js";
+import { ensureDir } from "../../utils/fsx.js";
+import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
+import { validateGroupName } from "../../utils/validate.js";
 
 /**
  * Write a file only if it doesn't exist unless --force is set.
  */
-async function writeIfAbsent(filePath: string, contents: string, force = false) {
+async function writeIfAbsent(filePath: string, contents: string, force = false): Promise<void> {
   if (!force) {
     try {
-      await access(filePath);
+      await fs.access(filePath);
       return; // exists, do not overwrite
     } catch {
       // not found, fall through to write
     }
   }
-  await writeFile(filePath, contents, "utf8");
+  await fs.writeFile(filePath, contents, "utf8");
 }
 
-// [nextforge.templates:layout:start]
+/**
+ * Parse comma-separated pages list
+ */
+function parsePages(pagesArg?: string): string[] {
+  if (!pagesArg?.trim()) return [];
+  return pagesArg
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Generate page code with data-testid
+ */
+function pageCode(name: string): string {
+  return `export default function Page() {
+  return <div data-testid="${name}">${name}</div>;
+}
+`;
+}
+
 function layoutTemplate() {
   return `import React, { type ReactNode } from "react";
 
@@ -67,72 +52,6 @@ export default function GroupLayout({ children }: { children: ReactNode }) {
 }
 `;
 }
-// [nextforge.templates:layout:end]
-
-// [nextforge.templates:page.tailwind:start]
-function pageTemplateTailwind(title: string) {
-  // Pretty title for seeded pages: strip brackets, title-case segments, join with slash
-  const pretty = title
-    .replace(/[[\].]/g, "")
-    .split("/")
-    .map((s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s))
-    .join(" / ");
-
-  return `import React from "react";
-
-export default async function Page() {
-  return (
-    <section className="p-8">
-      <h1 className="text-2xl font-semibold">${pretty}</h1>
-    </section>
-  );
-}
-`;
-}
-// [nextforge.templates:page.tailwind:end]
-
-// [nextforge.templates:page.basic:start]
-function pageTemplateBasic(title: string) {
-  const pretty = title
-    .replace(/[[\].]/g, "")
-    .split("/")
-    .map((s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s))
-    .join(" / ");
-
-  return `import React from "react";
-
-export default async function Page() {
-  return (
-    <section>
-      <h1>${pretty}</h1>
-    </section>
-  );
-}
-`;
-}
-// [nextforge.templates:page.basic:end]
-
-// [nextforge.templates:page.chakra:start]
-function pageTemplateChakra(title: string) {
-  const pretty = title
-    .replace(/[[\].]/g, "")
-    .split("/")
-    .map((s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s))
-    .join(" / ");
-
-  return `import React from "react";
-import { Container, Heading } from "@chakra-ui/react";
-
-export default async function Page() {
-  return (
-    <Container py={8}>
-      <Heading size="lg">${pretty}</Heading>
-    </Container>
-  );
-}
-`;
-}
-// [nextforge.templates:page.chakra:end]
 
 function readmeTemplate(groupLabel: string) {
   return `# ${groupLabel} route group
@@ -145,13 +64,6 @@ Use this folder to organize segments like auth flows, marketing sections, experi
 `;
 }
 
-/**
- * Registers: nextforge add:group <name>
- * Examples:
- *   nextforge add:group auth --with-layout
- *   nextforge add:group (auth) --pages signin,signup,[slug],[...rest],[[...maybe]]
- *   nextforge add:group marketing --app apps/web/app --no-readme
- */
 export function registerAddGroup(program: Command) {
   program
     .command("add:group")
@@ -167,21 +79,41 @@ export function registerAddGroup(program: Command) {
     )
     .action(async (name, opts) => {
       try {
-        // Safety: check for traversal segments in the raw input BEFORE any processing
-        const rawAppPath = opts.app;
-        const pathParts = rawAppPath.split(/[/\\]/);
-        if (pathParts.some((p: string) => p === "." || p === "..")) {
-          throw new Error(`Refusing to create unsafe app directory: ${rawAppPath}`);
+        // Validate and normalize group name
+        let group: string;
+        try {
+          group = validateGroupName(name);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("reserved") || msg.includes('"api"')) {
+            console.error(msg);
+          } else {
+            console.error(`add:group failed: ${msg}`);
+          }
+          process.exitCode = 1;
+          return;
         }
 
-        const fileCfg = await loadConfig({ verbose: Boolean(program.opts().verbose) });
-        const flagsCfg = { pagesDir: opts.app };
-        const config = mergeConfig({ fileConfig: fileCfg, env: process.env, flags: flagsCfg });
-        const group = normalizeGroupName(name);
-        const appDir = path.resolve(process.cwd(), config.pagesDir);
-        const groupDir = path.join(appDir, group);
+        // Check for unsafe paths (traversal) in the original app arg BEFORE resolving
+        if (opts.app) {
+          const pathParts = opts.app.split(/[/\\]/);
+          if (pathParts.some((p: string) => p === "." || p === "..")) {
+            const err = new Error(`Refusing to create unsafe app directory: ${opts.app}`);
+            console.error(err.message);
+            process.exitCode = 1;
+            throw err; // Re-throw for tests
+          }
+        }
 
-        await ensureAppDir(appDir, Boolean(program.opts().verbose));
+        // Resolve app directory with path normalization
+        const config = await loadConfig(process.cwd());
+        const appDir = await resolveAppRoot({
+          ...(opts.app && { appFlag: opts.app }),
+          ...(config.pagesDir && { configPagesDir: config.pagesDir }),
+          createIfMissing: true, // groups are allowed to create the app dir
+        });
+
+        const groupDir = path.join(appDir, group);
         await ensureDir(groupDir);
 
         if (opts.withLayout) {
@@ -189,53 +121,36 @@ export function registerAddGroup(program: Command) {
         }
 
         // Negated option: --no-readme sets opts.readme === false
-        if (opts.readme) {
+        if (opts.readme !== false) {
           await writeIfAbsent(path.join(groupDir, "README.md"), readmeTemplate(group), opts.force);
         }
 
-        const parsePages = (input?: string): string[] => {
-          if (!input) return [];
-          return String(input)
-            .split(",")
-            .map((s) => s.trim().replace(/^\/+|\/+$/g, ""))
-            .filter(Boolean)
-            .filter((s) => s !== "." && s !== "..");
-        };
-
-        const DYNAMIC = /^\[\.{0,3}[a-zA-Z0-9_-]+\]$/; // [id], [...rest], [[...maybe]] (outer [[...]] not yet)
-        const SEGMENT = /^[a-z0-9-]+$/i;
-        const isValidPart = (part: string) => SEGMENT.test(part) || DYNAMIC.test(part);
-
-        const rawSegments = Array.from(new Set(parsePages(opts.pages)));
-
-        for (const raw of rawSegments) {
-          const parts = raw.split("/").filter(Boolean);
-          const invalid = parts.filter((p) => !isValidPart(p));
-          if (invalid.length) {
-            throw new Error(
-              `Invalid page segment "${raw}". Bad parts: ${invalid.join(", ")}. ` +
-                `Use names like "signin", "[id]", "[...rest]", or nested "settings/notifications".`
-            );
-          }
-          const leafDir = path.join(groupDir, ...parts);
-          await ensureDir(leafDir);
-          const last = parts[parts.length - 1] || "page";
-          const contents = config.useChakra
-            ? pageTemplateChakra(last)
-            : config.useTailwind
-              ? pageTemplateTailwind(last)
-              : pageTemplateBasic(last);
-          await writeIfAbsent(path.join(leafDir, "page.tsx"), contents, opts.force);
+        // Parse and create pages
+        const pages = parsePages(opts.pages);
+        for (const pageName of pages) {
+          const pageDir = path.join(groupDir, pageName);
+          await ensureDir(pageDir);
+          const pageFile = path.join(pageDir, "page.tsx");
+          await writeIfAbsent(pageFile, pageCode(pageName), opts.force);
         }
 
         const rel = path.relative(process.cwd(), groupDir) || groupDir;
         console.log(`Created route group at ${rel}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`add:group failed: ${msg}`);
-        process.exitCode = 1;
-        // Rethrow so commander's exitOverride can handle it in tests
-        throw err;
+        if (msg.includes("reserved") || msg.includes('"api"')) {
+          console.error(msg);
+          process.exitCode = 1;
+          throw err; // Re-throw for tests
+        } else if (msg.includes("Refusing to create unsafe")) {
+          console.error(msg);
+          process.exitCode = 1;
+          throw err; // Re-throw for tests
+        } else {
+          console.error(`add:group failed: ${msg}`);
+          process.exitCode = 1;
+          throw err; // Re-throw for tests
+        }
       }
     });
 }

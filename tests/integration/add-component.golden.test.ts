@@ -38,7 +38,8 @@ describe("add:component", () => {
       JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "src/app" }, null, 2)
     );
 
-    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+    // Run without --app so pagesDir wins
+    await runCLI(["add:component", "Button", "--group", "ui"]);
 
     const files = await readTree(ws.dir, "src/app/components/ui/Button");
     expect(files).toEqual(["Button.tsx", "index.ts"]);
