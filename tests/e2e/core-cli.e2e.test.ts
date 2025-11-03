@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { exists, makeTempWorkspace, readText, runCli } from "./utils/tempWorkspace.js";
+import { exists, makeTempWorkspace, readText, runCli } from "../utils/tempWorkspace.js";
 
 describe("Core CLI smoke tests", () => {
   let workspace: Awaited<ReturnType<typeof makeTempWorkspace>>;

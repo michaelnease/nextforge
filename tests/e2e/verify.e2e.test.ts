@@ -7,7 +7,7 @@ const execAsync = promisify(exec);
 /**
  * CI verification tests.
  * NOTE: These tests are excluded from normal test runs via vitest.config.ts to prevent infinite loops.
- * Run manually with: vitest run tests/verify.e2e.test.ts --config vitest.config.verify.ts
+ * Run manually with: vitest run tests/e2e/verify.e2e.test.ts --config vitest.config.verify.ts
  */
 describe("CI verification tests", () => {
   it("npm build exits successfully", async () => {

@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { makeTempWorkspace, readText } from "../tests/utils/tempWorkspace.js";
+import { makeTempWorkspace, readText } from "../utils/tempWorkspace.js";
 
-import { registerAddGroup } from "./commands/add/group.js";
+import { registerAddGroup } from "../../src/commands/add/group.js";
 
 async function runCLI(args: string[]) {
   const program = new Command().name("nextforge").option("--verbose", "Enable verbose logs", false);

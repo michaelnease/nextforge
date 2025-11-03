@@ -5,7 +5,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     pool: "forks",
-    include: ["tests/verify.e2e.test.ts"],
+    include: ["tests/e2e/verify.e2e.test.ts"],
     exclude: ["node_modules", "dist", ".idea", ".git", ".cache"],
   },
 });

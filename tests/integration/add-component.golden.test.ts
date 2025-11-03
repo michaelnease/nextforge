@@ -3,9 +3,9 @@ import fs from "node:fs/promises";
 import { Command } from "commander";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { makeTempWorkspace, readTree, readText } from "../tests/utils/tempWorkspace.js";
+import { makeTempWorkspace, readTree, readText } from "../utils/tempWorkspace.js";
 
-import { registerAddComponent } from "./commands/add/component.js";
+import { registerAddComponent } from "../../src/commands/add/component.js";
 
 async function runCLI(args: string[]) {
   const program = new Command().name("nextforge");

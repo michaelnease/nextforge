@@ -8,7 +8,7 @@ import {
   runCli,
   writeFile,
   writeJson,
-} from "./utils/tempWorkspace.js";
+} from "../utils/tempWorkspace.js";
 
 describe("Config loader E2E tests", () => {
   let workspace: Awaited<ReturnType<typeof makeTempWorkspace>>;
