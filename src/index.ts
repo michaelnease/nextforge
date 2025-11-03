@@ -2,6 +2,7 @@
 import { Command } from "commander";
 
 import { registerAddComponent } from "./commands/add/component.js";
+import { registerAddCursor } from "./commands/add/cursor.js";
 import { registerAddDocker } from "./commands/add/docker.js";
 import { registerAddGroup } from "./commands/add/group.js";
 import { registerAddPage } from "./commands/add/page.js";
@@ -87,6 +88,7 @@ export async function main(): Promise<void> {
   registerAddDocker(program);
   registerInit(program);
   registerAddComponent(program);
+  registerAddCursor(program);
   // [nextforge.register:commands:end]
 
   await program.parseAsync(process.argv);
