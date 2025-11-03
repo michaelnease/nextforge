@@ -5,6 +5,7 @@ export const configSchema = z.object({
   useChakra: z.boolean().default(false),
   defaultLayout: z.string().default("main"),
   pagesDir: z.string().default("app"),
+  cursorDir: z.string().default(".nextforge/cursor"),
 });
 
 export type NextForgeConfig = z.infer<typeof configSchema>;
