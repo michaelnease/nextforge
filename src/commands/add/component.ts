@@ -57,7 +57,7 @@ async function writeIfAbsent(filePath: string, contents: string, force = false):
 }
 
 function withClientHeader(code: string, isClient: boolean) {
-  return isClient ? `"use client"\n\n` + code : code;
+  return isClient ? `"use client";\n\n` + code : code;
 }
 
 function pascalProps(name: string) {
@@ -123,7 +123,13 @@ async function appendExportIfMissing(
 
 async function sortBarrel(kindIndexPath: string) {
   const cur = await readIfExists(kindIndexPath);
-  const lines = cur.split("\n").filter(Boolean).sort();
+  // Filter out empty lines and invalid export lines, then sort and deduplicate
+  const lines = cur
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && l.startsWith("export"))
+    .filter((value, index, self) => self.indexOf(value) === index) // Deduplicate
+    .sort();
   await fs.writeFile(kindIndexPath, lines.join("\n") + "\n", "utf8");
 }
 
