@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { exists, makeTempWorkspace, readText, runCli, writeFile } from "./utils/tempWorkspace.js";
+import { exists, makeTempWorkspace, readText, runCli, writeFile } from "../utils/tempWorkspace.js";
 
 describe("Regression and safety E2E tests", () => {
   let workspace: Awaited<ReturnType<typeof makeTempWorkspace>>;

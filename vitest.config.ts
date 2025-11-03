@@ -5,17 +5,14 @@ export default defineConfig({
     globals: true,
     environment: "node",
     pool: "forks",
-    include: [
-      "src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}",
-      "tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}",
-    ],
+    include: ["tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     exclude: [
       "node_modules",
       "dist",
       ".idea",
       ".git",
       ".cache",
-      "tests/verify.e2e.test.ts", // Exclude verify tests from normal runs to prevent infinite loops
+      "tests/e2e/verify.e2e.test.ts", // Exclude verify tests from normal runs to prevent infinite loops
     ],
   },
 });

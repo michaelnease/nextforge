@@ -9,7 +9,7 @@ describe("Build smoke test", () => {
 
     // Use dynamic import to avoid build-time resolution issues
     // eslint-disable-next-line import/no-unresolved
-    const mod = await import("../dist/index.js");
+    const mod = await import("../../dist/index.js");
     expect(typeof mod.main).toBe("function");
   });
 });
