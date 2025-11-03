@@ -635,27 +635,45 @@ export default async function Page() {
 
 ### Add Cursor
 
-Create Cursor AI rule files and phase prompts to guide AI-assisted development:
+Generate Cursor AI rule files and phase prompts to guide AI-assisted development. Files are created in JSON format by default, with optional MDX output.
 
 ```bash
-# Create a rules file for component development
-npx nextforge add:cursor rules --name component
+# Create a rules file (JSON format by default)
+npx nextforge add:cursor rules --name audit-trace
 
-# Create a phase prompt for implementation tracking
+# Create rules in MDX format
+npx nextforge add:cursor rules --name perf-budget --mdx
+
+# Create phase prompts for implementation tracking
 npx nextforge add:cursor phase --phase 1
 
 # Multiple phases for complex features
-npx nextforge add:cursor phase --phase 2
-npx nextforge add:cursor phase --phase 3
+npx nextforge add:cursor phase --phase 2 --mdx
+
+# Custom output directory (overrides config)
+npx nextforge add:cursor rules --name security --cursor-dir .cursor/custom
 
 # Overwrite existing files
-npx nextforge add:cursor rules --name component --force
+npx nextforge add:cursor rules --name api-design --force
 ```
 
-#### Cursor File Types
+#### Directory Precedence
 
-- **`rules`** → Creates `.nextforge/cursor/rules/<name>.rules.md` - Define rules and conventions for specific development areas
-- **`phase`** → Creates `.nextforge/cursor/phases/phase-<n>.md` - Track multi-phase implementation steps
+The output directory is determined by the following precedence:
+
+1. `--cursor-dir` CLI flag (highest priority)
+2. `config.cursorDir` from `nextforge.config.{json,ts}`
+3. `.nextforge/cursor` (default)
+
+#### File Types
+
+- **`rules`** → Creates `<cursorDir>/rules/<name>.rules.{json,mdx}` - Define rules and conventions for specific development areas
+- **`phase`** → Creates `<cursorDir>/phases/phase-<n>.{json,mdx}` - Track multi-phase implementation steps
+
+#### Format Options
+
+- **JSON** (default): Structured data format, ideal for programmatic access
+- **MDX** (with `--mdx` flag): Markdown with frontmatter, ideal for documentation and human readability
 
 #### Generated Files
 
