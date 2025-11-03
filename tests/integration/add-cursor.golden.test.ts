@@ -41,39 +41,59 @@ describe("add:cursor", () => {
     await ws.cleanup();
   });
 
-  it("creates rules file", async () => {
+  it("creates rules file in JSON format by default", async () => {
     await runCLI(["add:cursor", "rules", "--name", "component"]);
 
-    const filePath = join(ws.dir, ".nextforge/cursor/rules/component.rules.md");
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/component.rules.json");
     await expect(exists(filePath)).resolves.toBe(true);
 
     const content = await readText(filePath);
-    expect(content).toContain("Cursor Rules — component");
-    expect(content).toContain("## Purpose");
-    expect(content).toContain("## Cursor Setup");
-    expect(content).toContain("## Example Prompt");
+    const parsed = JSON.parse(content);
+    expect(parsed.name).toBe("component");
+    expect(parsed.$schema).toBeDefined();
   });
 
-  it("creates phase file", async () => {
+  it("creates phase file in JSON format by default", async () => {
     await runCLI(["add:cursor", "phase", "--phase", "1"]);
 
-    const filePath = join(ws.dir, ".nextforge/cursor/phases/phase-1.md");
+    const filePath = join(ws.dir, ".nextforge/cursor/phases/phase-1.json");
     await expect(exists(filePath)).resolves.toBe(true);
 
     const content = await readText(filePath);
-    expect(content).toContain("# Phase 1");
-    expect(content).toContain("## Goal");
-    expect(content).toContain("## Steps");
-    expect(content).toContain("## Cursor Prompt Example");
+    const parsed = JSON.parse(content);
+    expect(parsed.phase).toBe(1);
+    expect(parsed.title).toBe("Phase 1");
   });
 
-  it("force overwrites", async () => {
-    const filePath = join(ws.dir, ".nextforge/cursor/rules/test.rules.md");
+  it("creates MDX files when --mdx flag is used", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "test-mdx", "--mdx"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/test-mdx.rules.mdx");
+    await expect(exists(filePath)).resolves.toBe(true);
+
+    const content = await readText(filePath);
+    expect(content).toContain("# Cursor Rules — test-mdx");
+    expect(content).toContain("## Purpose");
+  });
+
+  it("creates MDX phase files when --mdx flag is used", async () => {
+    await runCLI(["add:cursor", "phase", "--phase", "5", "--mdx"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/phases/phase-5.mdx");
+    await expect(exists(filePath)).resolves.toBe(true);
+
+    const content = await readText(filePath);
+    expect(content).toContain("# Phase 5");
+    expect(content).toContain("## Goal");
+  });
+
+  it("force overwrites existing files", async () => {
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/test.rules.json");
 
     // Create first time
     await runCLI(["add:cursor", "rules", "--name", "test"]);
     const firstContent = await readText(filePath);
-    expect(firstContent).toContain("Cursor Rules — test");
+    expect(JSON.parse(firstContent).name).toBe("test");
 
     // Modify the file
     await writeFile(filePath, "modified content");
@@ -88,13 +108,13 @@ describe("add:cursor", () => {
     // Try with force - should overwrite
     await runCLI(["add:cursor", "rules", "--name", "test", "--force"]);
     const afterForce = await readText(filePath);
-    expect(afterForce).toContain("Cursor Rules — test");
+    expect(JSON.parse(afterForce).name).toBe("test");
     expect(afterForce).not.toBe("modified content");
   });
 
   it("invalid type errors", async () => {
     await expect(runCLI(["add:cursor", "invalid"])).rejects.toThrow(
-      'Invalid --type. Use "rules" or "phase".'
+      'Invalid type. Use one of: "rules", "phase"'
     );
   });
 
@@ -128,17 +148,17 @@ describe("add:cursor", () => {
     await runCLI(["add:cursor", "phase", "--phase", "2"]);
     await runCLI(["add:cursor", "phase", "--phase", "3"]);
 
-    const phase2Path = join(ws.dir, ".nextforge/cursor/phases/phase-2.md");
-    const phase3Path = join(ws.dir, ".nextforge/cursor/phases/phase-3.md");
+    const phase2Path = join(ws.dir, ".nextforge/cursor/phases/phase-2.json");
+    const phase3Path = join(ws.dir, ".nextforge/cursor/phases/phase-3.json");
 
     await expect(exists(phase2Path)).resolves.toBe(true);
     await expect(exists(phase3Path)).resolves.toBe(true);
 
-    const phase2Content = await readText(phase2Path);
-    const phase3Content = await readText(phase3Path);
+    const phase2Content = JSON.parse(await readText(phase2Path));
+    const phase3Content = JSON.parse(await readText(phase3Path));
 
-    expect(phase2Content).toContain("# Phase 2");
-    expect(phase3Content).toContain("# Phase 3");
+    expect(phase2Content.phase).toBe(2);
+    expect(phase3Content.phase).toBe(3);
   });
 
   it("logs write/skip/force overwrite messages", async () => {
@@ -147,12 +167,12 @@ describe("add:cursor", () => {
     console.log = (...args: unknown[]) => logs.push(args.join(" "));
 
     try {
-      const filePath = join(ws.dir, ".nextforge/cursor/rules/logging-test.rules.md");
+      const filePath = join(ws.dir, ".nextforge/cursor/rules/logging-test.rules.json");
 
       // First creation - should log "write"
       await runCLI(["add:cursor", "rules", "--name", "logging-test"]);
       expect(
-        logs.some((log) => log.includes("write") && log.includes("logging-test.rules.md"))
+        logs.some((log) => log.includes("write") && log.includes("logging-test.rules.json"))
       ).toBe(true);
 
       // Second run without force - should log "skip"
@@ -170,47 +190,41 @@ describe("add:cursor", () => {
   it("normalizes names to kebab-case", async () => {
     await runCLI(["add:cursor", "rules", "--name", "My Component Test"]);
 
-    const filePath = join(ws.dir, ".nextforge/cursor/rules/my-component-test.rules.md");
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/my-component-test.rules.json");
     await expect(exists(filePath)).resolves.toBe(true);
 
-    const content = await readText(filePath);
-    expect(content).toContain("Cursor Rules — my-component-test");
+    const content = JSON.parse(await readText(filePath));
+    expect(content.name).toBe("my-component-test");
   });
 
   it("rejects empty names", async () => {
     await expect(runCLI(["add:cursor", "rules", "--name", ""])).rejects.toThrow(
-      "Name cannot be empty"
+      "Invalid --name. Use letters/numbers. Example: audit-trace"
     );
 
     await expect(runCLI(["add:cursor", "rules", "--name", "   "])).rejects.toThrow(
-      "Name cannot be empty"
+      "Invalid --name. Use letters/numbers. Example: audit-trace"
     );
   });
 
   it("rejects invalid names with only special characters", async () => {
     await expect(runCLI(["add:cursor", "rules", "--name", "!!!"])).rejects.toThrow(
-      "Invalid name - must contain at least one alphanumeric character"
+      "Invalid --name. Use letters/numbers. Example: audit-trace"
     );
   });
 
-  it("creates MDX files when --mdx flag is used", async () => {
-    await runCLI(["add:cursor", "rules", "--name", "test-mdx", "--mdx"]);
+  it("handles quotes in names", async () => {
+    await runCLI(["add:cursor", "rules", "--name", '"web-api"']);
 
-    const filePath = join(ws.dir, ".nextforge/cursor/rules/test-mdx.rules.mdx");
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/web-api.rules.json");
     await expect(exists(filePath)).resolves.toBe(true);
-
-    const content = await readText(filePath);
-    expect(content).toContain("Cursor Rules — test-mdx");
   });
 
-  it("creates MDX phase files when --mdx flag is used", async () => {
-    await runCLI(["add:cursor", "phase", "--phase", "5", "--mdx"]);
+  it("removes consecutive dashes", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "my---component"]);
 
-    const filePath = join(ws.dir, ".nextforge/cursor/phases/phase-5.mdx");
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/my-component.rules.json");
     await expect(exists(filePath)).resolves.toBe(true);
-
-    const content = await readText(filePath);
-    expect(content).toContain("# Phase 5");
   });
 
   it("creates index.json to track generated files", async () => {
@@ -227,6 +241,7 @@ describe("add:cursor", () => {
     expect(index.length).toBeGreaterThanOrEqual(2);
     expect(index.some((item: { type: string }) => item.type === "rules")).toBe(true);
     expect(index.some((item: { type: string }) => item.type === "phases")).toBe(true);
+    expect(index.some((item: { format: string }) => item.format === "json")).toBe(true);
   });
 
   it("updates index.json on duplicate file overwrites", async () => {
@@ -254,7 +269,44 @@ describe("add:cursor", () => {
 
     await runCLI(["add:cursor", "rules", "--name", "custom-dir"]);
 
-    const filePath = join(ws.dir, ".custom/cursor/rules/custom-dir.rules.md");
+    const filePath = join(ws.dir, ".custom/cursor/rules/custom-dir.rules.json");
     await expect(exists(filePath)).resolves.toBe(true);
+  });
+
+  it("respects --cursor-dir over config", async () => {
+    // Create a custom config
+    await writeFile(
+      join(ws.dir, "nextforge.config.json"),
+      JSON.stringify({ cursorDir: ".custom/from-config" }, null, 2)
+    );
+
+    await runCLI(["add:cursor", "rules", "--name", "security", "--cursor-dir", ".cursor/cli"]);
+
+    const filePath = join(ws.dir, ".cursor/cli/rules/security.rules.json");
+    await expect(exists(filePath)).resolves.toBe(true);
+
+    const content = JSON.parse(await readText(filePath));
+    expect(content.name).toBe("security");
+  });
+
+  it("uses default .nextforge/cursor when no config or flag", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "default-location"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/default-location.rules.json");
+    await expect(exists(filePath)).resolves.toBe(true);
+  });
+
+  it("tracks format in index for both JSON and MDX", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "json-test"]);
+    await runCLI(["add:cursor", "rules", "--name", "mdx-test", "--mdx"]);
+
+    const indexPath = join(ws.dir, ".nextforge/cursor/index.json");
+    const index = JSON.parse(await readText(indexPath));
+
+    const jsonEntry = index.find((item: { name: string }) => item.name === "json-test");
+    const mdxEntry = index.find((item: { name: string }) => item.name === "mdx-test");
+
+    expect(jsonEntry.format).toBe("json");
+    expect(mdxEntry.format).toBe("mdx");
   });
 });

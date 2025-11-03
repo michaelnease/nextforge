@@ -1,5 +1,43 @@
-export function phaseTemplate(phase: number): string {
-  return `# Phase ${phase}
+type PhaseTemplateInput = {
+  phase: number;
+  format: "mdx" | "json";
+};
+
+export function phaseTemplate({ phase, format }: PhaseTemplateInput): string {
+  if (format === "json") {
+    return (
+      JSON.stringify(
+        {
+          $schema: "https://cursor.directory/schema.json",
+          phase,
+          title: `Phase ${phase}`,
+          goal: `Complete Phase ${phase} of the NextForge implementation`,
+          steps: [
+            "Review the requirements for this phase",
+            "Implement the necessary changes",
+            "Run tests to verify correctness",
+            "Update documentation",
+          ],
+          validation: [
+            "All tests pass",
+            "Build completes without errors",
+            "Generated files follow conventions",
+            "Documentation is updated",
+          ],
+        },
+        null,
+        2
+      ) + "\n"
+    );
+  }
+
+  // MDX format
+  return `---
+phase: ${phase}
+title: Phase ${phase}
+---
+
+# Phase ${phase}
 
 ## Goal
 
