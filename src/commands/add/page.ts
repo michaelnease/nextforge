@@ -1,340 +1,207 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { Command } from "commander";
 
-/** Normalize a route group name: "auth" or "(auth)" -> "(auth)". */
-function normalizeGroupName(input: string): `(${string})` {
-  const trimmed = input.trim();
-  if (!trimmed) throw new Error("Group name is required");
-  const name = trimmed.startsWith("(") && trimmed.endsWith(")") ? trimmed.slice(1, -1) : trimmed;
-  if (!/^[a-z0-9-]+$/i.test(name)) {
-    throw new Error(`Invalid group name "${name}". Use letters, numbers, and dashes only.`);
-  }
-  return `(${name})`;
-}
+import { loadConfig } from "../../config/loadConfig.js";
+import { ensureDir, safeWrite } from "../../utils/fsx.js";
+import { updatePageManifest } from "../../utils/manifest.js";
+import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
+import { validatePageRoute } from "../../utils/validate.js";
 
-async function ensureDir(dir: string) {
-  await fs.mkdir(dir, { recursive: true });
-}
-
-async function assertAppDir(appDir: string): Promise<void> {
-  try {
-    const stat = await fs.stat(appDir);
-    if (!stat.isDirectory()) throw new Error();
-  } catch {
-    throw new Error(`App directory not found: ${appDir}`);
-  }
-}
-
-/** Write a file if missing, unless --force is set. */
-async function writeIfAbsent(filePath: string, contents: string, force = false): Promise<boolean> {
-  try {
-    if (!force) {
-      await fs.access(filePath);
-      console.log(`skip  ${path.relative(process.cwd(), filePath)} (exists)`);
-      return false;
-    }
-  } catch {
-    // file missing, fall through and write
-  }
-  if (force) {
-    console.log(`force overwrite -> ${path.relative(process.cwd(), filePath)}`);
-  }
-  await fs.writeFile(filePath, contents, "utf8");
-  console.log(`write ${path.relative(process.cwd(), filePath)}`);
-  return true;
-}
-
-/** Validate and resolve a route like "blog/[slug]" into its leaf dir. */
-function resolveRouteDir(
-  appDir: string,
-  routePath: string,
-  group?: string
-): {
-  leafDir: string;
-  pageName: string;
-  cleanRoute: string;
-  normalizedGroup: `(${string})` | undefined;
-  urlParts: string[]; // non-group parts for URL building and api detection
-} {
-  const clean = routePath.trim().replace(/^\/+|\/+$/g, "");
-  if (!clean) throw new Error("Route path is required, e.g. 'about' or 'blog/[slug]'");
-
-  // allow: static segs, [id], [...parts], [[...parts]]
-  const segPattern = /^(\[\[\.{3}[a-z0-9-]+\]\]|\[\.{3}[a-z0-9-]+\]|\[[a-z0-9-]+\]|[a-z0-9-]+)$/i;
-
-  // clearer message for special Next.js segments you are not supporting yet
-  if (/^@|^\(\.\.|.*\(\.\.\)/.test(clean)) {
-    throw new Error(
-      `Parallel routes (@slot) and intercepting routes (..segment) are not supported by this command yet.`
-    );
-  }
-
-  // avoid double grouping like route="(auth)/profile" with --group auth
-  const routeStartsWithGroup = /^\([a-z0-9-]+\)\//i.test(clean);
-  const normalizedGroup = group ? normalizeGroupName(group) : undefined;
-  const effectiveGroup =
-    routeStartsWithGroup && normalizedGroup
-      ? undefined // route already carries a group, ignore --group
-      : normalizedGroup;
-
-  // remove ALL leading group prefixes from route for validation and URL
-  let routeForValidation = clean;
-  while (/^\([a-z0-9-]+\)\//i.test(routeForValidation)) {
-    routeForValidation = routeForValidation.replace(/^\([a-z0-9-]+\)\//i, "");
-  }
-  const parts = routeForValidation.split("/");
-  for (const seg of parts) {
-    if (!segPattern.test(seg)) {
-      throw new Error(
-        `Invalid segment "${seg}". Allowed: letters, numbers, dashes. Dynamic: [id], catch-all: [...parts], optional: [[...parts]]. ` +
-          `If you use zsh, quote the route: "blog/[slug]"`
-      );
+/**
+ * Generate page template based on async/client flags and route segment.
+ */
+function generatePageTemplate(client: boolean, async: boolean, routeSegment?: string): string {
+  // For dynamic routes, extract param name from [slug] or [[...slug]]
+  let content = "<div>page</div>";
+  if (routeSegment) {
+    const match = routeSegment.match(/\[+([^\]]+)\]+/);
+    if (match && match[1]) {
+      const paramName = match[1].replace("...", "");
+      const capitalize = paramName.charAt(0).toUpperCase() + paramName.slice(1);
+      content = `<div>${capitalize}</div>`;
     }
   }
 
-  const baseDir = effectiveGroup ? path.join(appDir, effectiveGroup) : appDir;
-  const leafDir = path.join(baseDir, ...parts);
-  const pageName = parts[parts.length - 1]!;
-  return { leafDir, pageName, cleanRoute: clean, normalizedGroup: effectiveGroup, urlParts: parts };
-}
-
-/** Simple page templates */
-function toTitle(seg: string) {
-  // Handles: "[slug]" -> "Slug", "[[...id]]" -> "Id", "about-us" -> "About Us", "userProfile" -> "User Profile"
-  const core = seg.replace(/^\[{1,2}\.{0,3}|\]{1,2}$/g, "");
-  const words = core
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2") // split camelCase
-    .split(/[-_ ]/g)
-    .filter(Boolean);
-  return words.map((w) => w[0]?.toUpperCase() + w.slice(1)).join(" ") || "Page";
-}
-
-function pageTemplateSync(title: string) {
-  const pretty = toTitle(title);
-  return `import type { Metadata } from "next";
-export const metadata: Metadata = { title: "${pretty}" };
+  if (client) {
+    return `"use client";
 
 export default function Page() {
-  return (
-    <section className="p-8">
-      <h1 className="text-2xl font-semibold">${pretty}</h1>
-      <p className="mt-2 text-gray-600">Synchronous page generated by NextForge.</p>
-    </section>
-  );
+  return ${content};
+}
+`;
+  }
+
+  if (async) {
+    return `export default async function Page() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return ${content};
+}
+`;
+  }
+
+  // Sync server component
+  return `export default function Page() {
+  return ${content};
 }
 `;
 }
 
-function pageTemplateAsync(title: string) {
-  const pretty = toTitle(title);
-  return `import type { Metadata } from "next";
-export const metadata: Metadata = { title: "${pretty}" };
-
-export default async function Page() {
-  const res = await fetch("https://jsonplaceholder.typicode.com/todos/1", { cache: "no-store" });
-  const data = await res.json();
-  return (
-    <section className="p-8">
-      <h1 className="text-2xl font-semibold">${pretty} (async)</h1>
-      <pre className="mt-3 text-xs bg-gray-100 p-3 rounded-lg overflow-auto">
-{JSON.stringify(data, null, 2)}
-      </pre>
-    </section>
-  );
+/**
+ * Generate layout template based on client flag.
+ */
+function generateLayoutTemplate(client: boolean): string {
+  const clientDirective = client ? '"use client";\n\n' : "";
+  return `${clientDirective}export default function Layout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
 `;
 }
 
-function pageTemplateClient(title: string) {
-  const pretty = toTitle(title);
-  return `"use client";
+/**
+ * Generate API route template.
+ */
+function generateApiRouteTemplate(): string {
+  return `import { NextResponse } from "next/server";
 
-import { useState } from "react";
-
-export default function Page() {
-  const [count, setCount] = useState(0);
-  return (
-    <section className="p-8">
-      <h1 className="text-2xl font-semibold">${pretty} (client)</h1>
-      <button 
-        className="mt-3 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        onClick={() => setCount((c) => c + 1)}
-      >
-        Count: {count}
-      </button>
-    </section>
-  );
+export async function GET() {
+  return NextResponse.json({ ok: true });
 }
+`;
+}
+
+/**
+ * Generate page test template.
+ */
+function generatePageTestTemplate(route: string): string {
+  return `import Page from "../page";
+import { render, screen } from "@testing-library/react";
+
+describe("page ${route}", () => {
+  it("renders", () => {
+    render(<Page />);
+    expect(screen.getByText(/page/i)).toBeTruthy();
+  });
+});
 `;
 }
 
 export function registerAddPage(program: Command) {
   program
     .command("add:page")
-    .description("Create a page under app/ or inside a route group")
-    .argument("<route>", "Route path like 'about', 'blog/[slug]', or 'docs/[...parts]'")
-    .option("-g, --group <name>", "Target route group, e.g. '(auth)' or 'auth'")
-    .option("--async", "Generate an async server component")
-    .option("--client", "Generate a client component")
-    .option("--layout", "Also create a minimal layout.tsx in the leaf directory if missing")
-    .option("--loading", "Also create loading.tsx in the leaf directory if missing")
-    .option("--error", "Also create error.tsx in the leaf directory if missing")
-    .option("--api", "Also create a route.ts API handler in the same leaf directory if missing")
-    .option("--skip-page", "Do not create page.tsx (useful for pure API routes)")
-    .option("--force", "Overwrite existing files")
+    .description("Create a page under app/")
+    .argument("<route>", "Route path like 'reports' or 'account/settings'")
+    .option("--app <dir>", "App directory (default: app)")
+    .option("--async", "Generate an async server component", false)
+    .option("--client", "Generate a client component", false)
+    .option("--force", "Overwrite existing files", false)
+    .option("--layout", "Create layout.tsx", false)
+    .option("--api", "Create API route (route.ts)", false)
+    .option("--skip-page", "Skip creating page.tsx (use with --api)", false)
+    .option("--group <name>", "Wrap in route group, e.g., auth creates (auth)/route")
+    .option("--with-tests", "Create test file", false)
     .action(
       async (
         route: string,
         opts: {
-          group?: string;
+          app?: string;
           async?: boolean;
           client?: boolean;
+          force?: boolean;
           layout?: boolean;
-          loading?: boolean;
-          error?: boolean;
           api?: boolean;
           skipPage?: boolean;
-          force?: boolean;
+          group?: string;
+          withTests?: boolean;
         }
       ) => {
         try {
+          // Check mutually exclusive flags
           if (opts.async && opts.client) {
-            throw new Error("Choose exactly one of --async or --client");
+            console.error("Choose exactly one of --async or --client");
+            process.exitCode = 1;
+            return;
           }
-          const appDir = path.join(process.cwd(), "app");
-          await assertAppDir(appDir);
 
-          // Note for zsh users: quote dynamic segments. Example: "blog/[slug]"
-          const { leafDir, pageName, cleanRoute, normalizedGroup, urlParts } = resolveRouteDir(
-            appDir,
-            route,
-            opts.group
-          );
-          await ensureDir(leafDir);
-
-          const posixLocation = path.posix.join("app", normalizedGroup ?? "", cleanRoute);
-
-          // auto-skip page for typical API paths unless explicitly requested
-          const isApiSegment = urlParts[0]?.toLowerCase() === "api";
-          const shouldCreatePage = !opts.skipPage && !isApiSegment;
-          const createdFiles: string[] = [];
-
-          if (shouldCreatePage) {
-            const pagePath = path.join(leafDir, "page.tsx");
-            const contents = opts.client
-              ? pageTemplateClient(pageName)
-              : opts.async
-                ? pageTemplateAsync(pageName)
-                : pageTemplateSync(pageName);
-            if (await writeIfAbsent(pagePath, contents, !!opts.force)) {
-              createdFiles.push("page.tsx");
+          // Validate route
+          try {
+            validatePageRoute(route);
+          } catch (err) {
+            if (err instanceof Error && err.message === "Invalid segment") {
+              console.error("Invalid segment");
+              process.exitCode = 1;
+              return;
             }
+            throw err;
           }
 
+          // Load config and resolve app directory
+          const config = await loadConfig(process.cwd());
+          const appDir = await resolveAppRoot({
+            ...(opts.app && { appFlag: opts.app }),
+            ...(config.pagesDir && { configPagesDir: config.pagesDir }),
+            createIfMissing: false, // pages must error if the app dir is missing
+          });
+
+          // Generate page path with optional route group
+          let routeSegments = route.split("/").filter(Boolean);
+          if (opts.group) {
+            // Wrap in route group: (groupName)
+            const groupName = opts.group.startsWith("(") ? opts.group : `(${opts.group})`;
+            routeSegments = [groupName, ...routeSegments];
+          }
+          const pageDir = path.join(appDir, ...routeSegments);
+          await ensureDir(pageDir);
+
+          // Write page file unless --skip-page is set
+          if (!opts.skipPage) {
+            const pagePath = path.join(pageDir, "page.tsx");
+            const lastSegment = routeSegments[routeSegments.length - 1];
+            const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
+            await safeWrite(pagePath, template, opts.force ? { force: true } : {});
+          }
+
+          // Write layout file if --layout is set
           if (opts.layout) {
-            const layoutPath = path.join(leafDir, "layout.tsx");
-            const layout = `export default function Layout({ children }: { children: React.ReactNode }) {
-  return <div className="p-6">{children}</div>;
-}
-`;
-            if (await writeIfAbsent(layoutPath, layout, !!opts.force)) {
-              createdFiles.push("layout.tsx");
-            }
+            const layoutPath = path.join(pageDir, "layout.tsx");
+            const layoutTemplate = generateLayoutTemplate(!!opts.client);
+            await safeWrite(layoutPath, layoutTemplate, opts.force ? { force: true } : {});
           }
 
-          if (opts.loading) {
-            const loadingPath = path.join(leafDir, "loading.tsx");
-            const loading = `export default function Loading() {
-  return <div className="p-6 text-sm text-gray-600">Loading...</div>;
-}
-`;
-            if (await writeIfAbsent(loadingPath, loading, !!opts.force)) {
-              createdFiles.push("loading.tsx");
-            }
-          }
-
-          if (opts.error) {
-            const errorPath = path.join(leafDir, "error.tsx");
-            const error = `"use client";
-export default function Error({ error, reset }: { error: Error; reset: () => void }) {
-  return (
-    <div className="p-6 space-y-3">
-      <h2 className="text-lg font-semibold">Something went wrong</h2>
-      <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-auto">{String(error)}</pre>
-      <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={reset}>Try again</button>
-    </div>
-  );
-}
-`;
-            if (await writeIfAbsent(errorPath, error, !!opts.force)) {
-              createdFiles.push("error.tsx");
-            }
-          }
-
+          // Write API route file if --api is set
           if (opts.api) {
-            const routePath = path.join(leafDir, "route.ts");
-            const urlPath = "/" + urlParts.join("/");
-            const route = `import type { NextRequest } from "next/server";
-
-export async function GET(req: NextRequest) {
-  return Response.json({ ok: true, route: "${urlPath}" });
-}
-
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  return Response.json({ ok: true, received: body }, { status: 201 });
-}
-`;
-            if (await writeIfAbsent(routePath, route, !!opts.force)) {
-              createdFiles.push("route.ts");
-            }
+            const apiPath = path.join(pageDir, "route.ts");
+            const apiTemplate = generateApiRouteTemplate();
+            await safeWrite(apiPath, apiTemplate, opts.force ? { force: true } : {});
           }
 
-          const readmePath = path.join(leafDir, "README.md");
-          const urlPath = "/" + urlParts.join("/");
-          const readme = shouldCreatePage
-            ? `# ${toTitle(pageName)} page
-
-- Generated by NextForge.
-- Location: \`${posixLocation}\`
-- Dynamic segments like \`[slug]\` are available on the server via the \`params\` prop.
-- Example:
-\`\`\`tsx
-export default function Page({ params }: { params: Record<string, string | string[]> }) {
-  // params.slug or params.parts
-  return <pre>{JSON.stringify(params, null, 2)}</pre>;
-}
-\`\`\`
-`
-            : `# ${toTitle(pageName)} route
-
-- Generated by NextForge.
-- Location: \`${posixLocation}\`
-- This leaf contains a \`route.ts\` API handler. Example usage:
-\`\`\`bash
-curl -X GET http://localhost:3000${urlPath}
-curl -X POST http://localhost:3000${urlPath} -H "content-type: application/json" -d '{"ok":true}'
-\`\`\`
-`;
-          if (await writeIfAbsent(readmePath, readme, !!opts.force)) {
-            createdFiles.push("README.md");
+          // Write test file if --with-tests is set
+          if (opts.withTests) {
+            const testDir = path.join(pageDir, "__tests__");
+            await ensureDir(testDir);
+            const testPath = path.join(testDir, "page.test.tsx");
+            const testTemplate = generatePageTestTemplate(route);
+            await safeWrite(testPath, testTemplate, opts.force ? { force: true } : {});
           }
 
-          const rel = path.relative(process.cwd(), leafDir) || leafDir;
-          if (createdFiles.length) {
-            console.log(`Created ${createdFiles.join(", ")} in ${rel}`);
-          } else {
-            console.log(`Nothing created. All targets already exist. Use --force to overwrite.`);
-          }
-          if (normalizedGroup) {
-            console.log(`Group resolved to ${normalizedGroup}`);
-          }
+          // Update page manifest
+          const manifestRoute = routeSegments.join("/");
+          await updatePageManifest(appDir, manifestRoute);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          console.error(`add:page failed: ${msg}`);
-          process.exitCode = 1;
+          if (msg.includes("Invalid segment") || msg.toLowerCase().includes("invalid")) {
+            console.error("Invalid segment");
+            process.exitCode = 1;
+            throw err; // Re-throw for tests
+          } else if (msg.includes("App directory not found")) {
+            console.error(msg);
+            process.exitCode = 1;
+            throw err; // Re-throw for tests
+          } else {
+            console.error(msg);
+            process.exitCode = 1;
+            throw err; // Re-throw for tests
+          }
         }
       }
     );
