@@ -13,6 +13,7 @@ async function writeIfAbsent(filePath: string, contents: string, force = false):
   try {
     if (!force) {
       await fs.access(filePath);
+      console.log(`skip   ${relPath} (exists)`);
       return; // file exists, skip
     }
   } catch {
@@ -26,9 +27,9 @@ async function writeIfAbsent(filePath: string, contents: string, force = false):
   await fs.writeFile(filePath, contents, "utf8");
 
   if (force) {
-    console.log(`overwrite -> ${relPath}`);
+    console.log(`force overwrite -> ${relPath}`);
   } else {
-    console.log(`create ${relPath}`);
+    console.log(`write  ${relPath}`);
   }
 }
 

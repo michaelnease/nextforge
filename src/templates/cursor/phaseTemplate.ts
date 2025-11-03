@@ -28,10 +28,8 @@ Tasks:
 - [ ] Write integration tests
 - [ ] Verify build passes
 
-Flags to consider:
---app <dir>     Specify app directory
+Available flags:
 --force         Overwrite existing files
---verbose       Enable detailed logging
 \`\`\`
 
 ## Validation

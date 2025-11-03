@@ -140,4 +140,30 @@ describe("add:cursor", () => {
     expect(phase2Content).toContain("# Phase 2");
     expect(phase3Content).toContain("# Phase 3");
   });
+
+  it("logs write/skip/force overwrite messages", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.join(" "));
+
+    try {
+      const filePath = join(ws.dir, ".nextforge/cursor/rules/logging-test.rules.md");
+
+      // First creation - should log "write"
+      await runCLI(["add:cursor", "rules", "--name", "logging-test"]);
+      expect(logs[logs.length - 1]).toContain("write");
+      expect(logs[logs.length - 1]).toContain(".nextforge/cursor/rules/logging-test.rules.md");
+
+      // Second run without force - should log "skip"
+      await runCLI(["add:cursor", "rules", "--name", "logging-test"]);
+      expect(logs[logs.length - 1]).toContain("skip");
+      expect(logs[logs.length - 1]).toContain("(exists)");
+
+      // Third run with force - should log "force overwrite"
+      await runCLI(["add:cursor", "rules", "--name", "logging-test", "--force"]);
+      expect(logs[logs.length - 1]).toContain("force overwrite");
+    } finally {
+      console.log = originalLog;
+    }
+  });
 });
