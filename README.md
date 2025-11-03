@@ -130,6 +130,9 @@ nextforge init
 
 # Create components
 nextforge add:component <name> --kind <ui|layout|section|feature> [options]
+
+# Create Cursor AI rule files and phase prompts
+nextforge add:cursor <type> [options]
 ```
 
 ### Page and API Route Generation
@@ -628,6 +631,90 @@ export default async function Page() {
     </section>
   );
 }
+```
+
+### Add Cursor
+
+Create Cursor AI rule files and phase prompts to guide AI-assisted development:
+
+```bash
+# Create a rules file for component development
+npx nextforge add:cursor rules --name component
+
+# Create a phase prompt for implementation tracking
+npx nextforge add:cursor phase --phase 1
+
+# Multiple phases for complex features
+npx nextforge add:cursor phase --phase 2
+npx nextforge add:cursor phase --phase 3
+
+# Overwrite existing files
+npx nextforge add:cursor rules --name component --force
+```
+
+#### Cursor File Types
+
+- **`rules`** → Creates `.nextforge/cursor/rules/<name>.rules.md` - Define rules and conventions for specific development areas
+- **`phase`** → Creates `.nextforge/cursor/phases/phase-<n>.md` - Track multi-phase implementation steps
+
+#### Generated Files
+
+**Rules File (`.nextforge/cursor/rules/component.rules.md`):**
+
+```markdown
+# Cursor Rules — component
+
+## Purpose
+
+Define rules and conventions for component to guide Cursor AI during development.
+
+## Cursor Setup
+
+Add this file to your Cursor rules:
+
+1. Open Cursor Settings
+2. Navigate to Rules
+3. Add `.nextforge/cursor/rules/component.rules.md`
+
+## Example Prompt
+
+\`\`\`yaml
+task: implement component
+context:
+
+- Use NextForge conventions
+- Follow TypeScript best practices
+- Include tests
+  \`\`\`
+```
+
+**Phase File (`.nextforge/cursor/phases/phase-1.md`):**
+
+```markdown
+# Phase 1
+
+## Goal
+
+Complete Phase 1 of the NextForge implementation.
+
+## Steps
+
+1. Review the requirements for this phase
+2. Implement the necessary changes
+3. Run tests to verify correctness
+4. Update documentation
+
+## Cursor Prompt Example
+
+\`\`\`
+Implement Phase 1 for NextForge:
+
+Tasks:
+
+- [ ] Scaffold required files
+- [ ] Add necessary configuration
+- [ ] Write integration tests
+      \`\`\`
 ```
 
 ## Development
