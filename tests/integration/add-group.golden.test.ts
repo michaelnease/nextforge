@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { makeTempWorkspace, readText } from "../tests/utils/tempWorkspace.js";
+import { makeTempWorkspace, readText } from "../utils/tempWorkspace.js";
 
-import { registerAddGroup } from "./commands/add/group.js";
+import { registerAddGroup } from "../../src/commands/add/group.js";
 
 async function runCLI(args: string[]) {
   const program = new Command().name("nextforge").option("--verbose", "Enable verbose logs", false);
@@ -28,13 +28,17 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 describe("add:group", () => {
-  let ws: { dir: string; restore: () => void };
+  let ws: Awaited<ReturnType<typeof makeTempWorkspace>>;
+  let originalCwd: string;
 
   beforeEach(async () => {
     ws = await makeTempWorkspace();
+    originalCwd = process.cwd();
+    process.chdir(ws.dir);
   });
   afterEach(async () => {
-    ws.restore();
+    process.chdir(originalCwd);
+    await ws.cleanup();
   });
 
   it("auto-creates missing --app dir and scaffolds group", async () => {

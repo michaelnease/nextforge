@@ -4,7 +4,11 @@
 
 - Commands live under `src/commands/**`.
 - Utilities live under `src/utils/**`.
-- Tests live in `src/**/*.test.ts` using Vitest.
+- Tests are organized in `tests/` folder:
+  - `tests/unit/` - Unit tests for individual functions/modules
+  - `tests/integration/` - Integration/golden tests for commands
+  - `tests/e2e/` - End-to-end tests that run the compiled CLI
+  - `tests/utils/` - Test utilities and helpers
 - Smoke tests in `scripts/smoke-*.mjs`.
 - CI configuration in `.github/workflows/ci.yml`.
 
@@ -34,7 +38,9 @@ Do not edit outside anchor blocks unless explicitly instructed.
 
 ### Testing Strategy
 
-- **Unit Tests**: Vitest tests in `src/**/*.test.ts` or `src/**/*.golden.test.ts`
+- **Unit Tests**: Vitest tests in `tests/unit/` for testing individual functions/modules
+- **Integration Tests**: Golden tests in `tests/integration/` for testing command behavior
+- **E2E Tests**: End-to-end tests in `tests/e2e/` that run the compiled CLI (`dist/index.js`)
 - **Smoke Tests**: End-to-end tests in `scripts/smoke-*.mjs` that run built CLI
 - **Test Utilities**: `tests/utils/tempWorkspace.ts` provides isolated test environments
 - Run tests: `npm test` (watch) or `npm run test:run` (once)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { doctorCommand } from "./doctor.js";
+import { doctorCommand } from "../../../src/commands/doctor.js";
 
 describe("nextforge CLI", () => {
   it("should have doctor command", () => {
