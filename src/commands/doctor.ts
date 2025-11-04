@@ -1,13 +1,21 @@
 import { Command } from "commander";
-import ora from "ora";
+
+import { runDoctor } from "../utils/doctor/runDoctor.js";
 
 export const doctorCommand = new Command("doctor")
-  .description("Run diagnostic checks on your Next.js project")
-  .action(async () => {
-    const spinner = ora("Doctor running. No checks implemented yet.").start();
-
-    // Simulate some work
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    spinner.succeed("Doctor running. No checks implemented yet.");
+  .description("Run health checks for your NextForge setup")
+  .option("--app <path>", "Path to Next.js app directory")
+  .option("--json", "Output JSON instead of text")
+  .option("--fix", "Try safe autofixes")
+  .option("--ci", "CI-friendly mode (no colors, no prompts)")
+  .option("--deep", "Run deep checks like tsc validation")
+  .option("--verbose", "Verbose logging")
+  .action(async (opts) => {
+    try {
+      const exitCode = await runDoctor(opts);
+      process.exit(exitCode);
+    } catch (err) {
+      console.error("Doctor crashed:", err);
+      process.exit(3);
+    }
   });
