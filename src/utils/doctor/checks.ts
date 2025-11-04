@@ -135,7 +135,10 @@ export const tsxLoaderCheck: Check = {
 /**
  * Detect app directory with flexible fallbacks
  */
-async function detectAppDir(cwd: string, preferred?: string): Promise<string | null> {
+async function detectAppDir(
+  cwd: string,
+  preferred?: string
+): Promise<{ found: string | null; all: string[] }> {
   const candidates: string[] = [];
   const pushIfDir = async (p: string) => {
     try {
@@ -150,7 +153,7 @@ async function detectAppDir(cwd: string, preferred?: string): Promise<string | n
   if (preferred) {
     const resolved = path.resolve(cwd, preferred);
     await pushIfDir(resolved);
-    return candidates[0] ?? null;
+    return { found: candidates[0] ?? null, all: candidates };
   }
 
   // Check if Nx monorepo
@@ -181,14 +184,14 @@ async function detectAppDir(cwd: string, preferred?: string): Promise<string | n
   await pushIfDir(path.join(cwd, "app"));
   await pushIfDir(path.join(cwd, "src", "app"));
 
-  return candidates[0] ?? null;
+  return { found: candidates[0] ?? null, all: candidates };
 }
 
 export const appDirCheck: Check = {
   id: "app-dir",
   title: "Next.js app directory",
   async run(ctx: CheckContext) {
-    const found = await detectAppDir(ctx.cwd, ctx.flags.app);
+    const { found, all } = await detectAppDir(ctx.cwd, ctx.flags.app);
 
     if (!found) {
       // Check if this is a Next.js project before failing hard
@@ -220,6 +223,15 @@ export const appDirCheck: Check = {
       return warn(
         "No Next.js app directory found (not a Next.js project or missing 'next' dependency)."
       );
+    }
+
+    // If multiple candidates found, warn and list them
+    if (all.length > 1) {
+      const relPaths = all.map((p) => path.relative(ctx.cwd, p));
+      return warn(`Multiple app directories found. Using first: ${path.relative(ctx.cwd, found)}`, {
+        details: `Found: ${relPaths.join(", ")}`,
+        fix: [`Pass --app <path> to specify which one to use`],
+      });
     }
 
     return ok(`Found app directory at ${path.relative(ctx.cwd, found)}`);

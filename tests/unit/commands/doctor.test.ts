@@ -42,8 +42,8 @@ describe("nextforge doctor", () => {
         cwd: process.cwd(),
         flags: {},
       });
-      // Should pass or fail, but not throw
-      expect(["pass", "fail"]).toContain(result.status);
+      // Should pass, warn (multiple candidates), or fail, but not throw
+      expect(["pass", "warn", "fail"]).toContain(result.status);
       if (result.status === "fail") {
         expect(result.fix).toBeDefined();
         expect(result.fix?.length).toBeGreaterThan(0);
