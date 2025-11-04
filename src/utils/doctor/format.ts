@@ -47,12 +47,15 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
     if (r.status === "warn") warned++;
   }
 
+  const exitCode = failed > 0 ? 2 : warned > 0 ? 1 : 0;
+
   if (flags.json) {
     console.log(
       JSON.stringify(
         {
           schema: "nextforge.doctor@1",
           ok: failed === 0,
+          exitCode,
           summary: {
             passed,
             warnings: warned,
@@ -83,7 +86,6 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
     if (warned > 0) summaryParts.push(`${warned} warnings`);
     if (failed > 0) summaryParts.push(`${failed} failed`);
 
-    const exitCode = failed > 0 ? 2 : warned > 0 ? 1 : 0;
     console.log(`Summary: ${summaryParts.join(", ")} • Exit ${exitCode}\n`);
   }
 
