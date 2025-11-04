@@ -1,1 +1,2 @@
-npm run verify
+# Fast checks on commit (2-5 seconds)
+npm run lint && npm run format:check && npm run typecheck

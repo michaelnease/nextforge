@@ -130,6 +130,9 @@ nextforge init
 
 # Create components
 nextforge add:component <name> --kind <ui|layout|section|feature> [options]
+
+# Create Cursor AI rule files and phase prompts
+nextforge add:cursor <type> [options]
 ```
 
 ### Page and API Route Generation
@@ -628,6 +631,108 @@ export default async function Page() {
     </section>
   );
 }
+```
+
+### Add Cursor
+
+Generate Cursor AI rule files and phase prompts to guide AI-assisted development. Files are created in JSON format by default, with optional MDX output.
+
+```bash
+# Create a rules file (JSON format by default)
+npx nextforge add:cursor rules --name audit-trace
+
+# Create rules in MDX format
+npx nextforge add:cursor rules --name perf-budget --mdx
+
+# Create phase prompts for implementation tracking
+npx nextforge add:cursor phase --phase 1
+
+# Multiple phases for complex features
+npx nextforge add:cursor phase --phase 2 --mdx
+
+# Custom output directory (overrides config)
+npx nextforge add:cursor rules --name security --cursor-dir .cursor/custom
+
+# Overwrite existing files
+npx nextforge add:cursor rules --name api-design --force
+```
+
+#### Directory Precedence
+
+The output directory is determined by the following precedence:
+
+1. `--cursor-dir` CLI flag (highest priority)
+2. `config.cursorDir` from `nextforge.config.{json,ts}`
+3. `.nextforge/cursor` (default)
+
+#### File Types
+
+- **`rules`** → Creates `<cursorDir>/rules/<name>.rules.{json,mdx}` - Define rules and conventions for specific development areas
+- **`phase`** → Creates `<cursorDir>/phases/phase-<n>.{json,mdx}` - Track multi-phase implementation steps
+
+#### Format Options
+
+- **JSON** (default): Structured data format, ideal for programmatic access
+- **MDX** (with `--mdx` flag): Markdown with frontmatter, ideal for documentation and human readability
+
+#### Generated Files
+
+**Rules File (`.nextforge/cursor/rules/component.rules.md`):**
+
+```markdown
+# Cursor Rules — component
+
+## Purpose
+
+Define rules and conventions for component to guide Cursor AI during development.
+
+## Cursor Setup
+
+Add this file to your Cursor rules:
+
+1. Open Cursor Settings
+2. Navigate to Rules
+3. Add `.nextforge/cursor/rules/component.rules.md`
+
+## Example Prompt
+
+\`\`\`yaml
+task: implement component
+context:
+
+- Use NextForge conventions
+- Follow TypeScript best practices
+- Include tests
+  \`\`\`
+```
+
+**Phase File (`.nextforge/cursor/phases/phase-1.md`):**
+
+```markdown
+# Phase 1
+
+## Goal
+
+Complete Phase 1 of the NextForge implementation.
+
+## Steps
+
+1. Review the requirements for this phase
+2. Implement the necessary changes
+3. Run tests to verify correctness
+4. Update documentation
+
+## Cursor Prompt Example
+
+\`\`\`
+Implement Phase 1 for NextForge:
+
+Tasks:
+
+- [ ] Scaffold required files
+- [ ] Add necessary configuration
+- [ ] Write integration tests
+      \`\`\`
 ```
 
 ## Development
