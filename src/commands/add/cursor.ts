@@ -30,7 +30,7 @@ function normalizeName(raw: string): string {
     .replace(/-+/g, "-");
 
   if (!slug || !isKebabCase(slug)) {
-    throw new Error('Invalid --name. Use kebab-case, e.g. "cursor-rules"');
+    throw new Error('Invalid --name. Use kebab-case (e.g. "component-rules")');
   }
 
   return slug;
@@ -141,14 +141,19 @@ export function registerAddCursor(program: Command) {
     .addHelpText(
       "after",
       `
-Directory precedence: --cursor-dir > config.cursorDir > .nextforge/cursor
+Subtypes:
+  rules   Generate Cursor AI rules file (requires --name)
+  phase   Generate phase implementation guide (requires --phase)
+
+Directory precedence:
+  --cursor-dir > config.cursorDir > .nextforge/cursor
 
 Examples:
-  $ nextforge add:cursor rules --name audit-trace
-  $ nextforge add:cursor rules --name perf-budget --mdx
-  $ nextforge add:cursor phase --phase 1
+  $ nextforge add:cursor rules --name component-rules --format json
+  $ nextforge add:cursor rules --name api-guidelines --mdx
+  $ nextforge add:cursor phase --phase 1 --format json
+  $ nextforge add:cursor phase --phase 2 --mdx --force
   $ nextforge add:cursor rules --name security --cursor-dir .cursor/custom
-  $ nextforge add:cursor rules --name api-design --force
 `
     )
     .action(
@@ -193,11 +198,11 @@ Examples:
             if (!isKebabCase(opts.name)) {
               if (opts.name !== opts.name.toLowerCase()) {
                 // Input contains uppercase - reject it
-                throw new Error('Invalid --name. Use kebab-case, e.g. "cursor-rules"');
+                throw new Error('Invalid --name. Use kebab-case (e.g. "component-rules")');
               }
               if (opts.name.includes("_")) {
                 // Input contains underscores - reject it
-                throw new Error('Invalid --name. Use kebab-case, e.g. "cursor-rules"');
+                throw new Error('Invalid --name. Use kebab-case (e.g. "component-rules")');
               }
             }
 
@@ -242,7 +247,7 @@ Examples:
 
             const phaseNum = parseInt(opts.phase, 10);
             if (isNaN(phaseNum) || phaseNum < 1) {
-              throw new Error("--phase must be a positive integer");
+              throw new Error("Invalid --phase. Provide a positive integer (e.g. --phase 3)");
             }
 
             const folder = "phases";

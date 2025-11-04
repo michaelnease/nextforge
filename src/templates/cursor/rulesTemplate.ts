@@ -8,20 +8,27 @@ export function rulesTemplate({ name, format }: RulesTemplateInput): string {
     return (
       JSON.stringify(
         {
-          $schema: "https://cursor.directory/schema.json",
+          $schema: "https://schemas.nextforge.dev/cursor-rules.v1.json",
           name,
-          description: `Cursor AI rules for ${name}`,
-          guidelines: [
-            "Follow existing code patterns",
-            "Use ESM imports",
-            "Add JSDoc comments for public APIs",
-            "Write tests alongside implementation",
-          ],
-          conventions: [
-            "Use TypeScript for type safety",
-            "Follow NextForge project structure",
-            "Include comprehensive error handling",
-            "Document complex logic",
+          version: 1,
+          scopes: ["components", "pages", "api"],
+          rules: [
+            {
+              id: "naming",
+              text: "Use PascalCase for components and folders under /app/components/*",
+            },
+            {
+              id: "tests",
+              text: "When --with-tests is specified, create *.test.tsx colocated with the component",
+            },
+            {
+              id: "imports",
+              text: "Use ESM imports and avoid default exports for better tree-shaking",
+            },
+            {
+              id: "types",
+              text: "Add JSDoc comments for public APIs and use TypeScript strict mode",
+            },
           ],
           dos: [
             "Keep functions small and focused",
@@ -35,7 +42,6 @@ export function rulesTemplate({ name, format }: RulesTemplateInput): string {
             "Don't use any types",
             "Don't commit commented-out code",
           ],
-          examples: [],
         },
         null,
         2
@@ -45,9 +51,12 @@ export function rulesTemplate({ name, format }: RulesTemplateInput): string {
 
   // MDX format
   return `---
+type: rules
+name: ${name}
 title: ${name}
+version: 1
+scopes: [components, pages, api]
 tags: [cursor, rules]
-description: Cursor AI rules for ${name}
 ---
 
 <!--
@@ -66,6 +75,20 @@ description: Cursor AI rules for ${name}
 ## Purpose
 
 Define rules and conventions for ${name} to guide Cursor AI during development.
+
+## Rules
+
+### Naming
+Use PascalCase for components and folders under \`/app/components/*\`
+
+### Tests
+When \`--with-tests\` is specified, create \`*.test.tsx\` colocated with the component
+
+### Imports
+Use ESM imports and avoid default exports for better tree-shaking
+
+### Types
+Add JSDoc comments for public APIs and use TypeScript strict mode
 
 ## Guidelines
 

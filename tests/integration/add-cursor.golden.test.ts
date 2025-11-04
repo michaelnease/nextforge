@@ -130,15 +130,15 @@ describe("add:cursor", () => {
 
   it("validates phase number is positive", async () => {
     await expect(runCLI(["add:cursor", "phase", "--phase", "0"])).rejects.toThrow(
-      "--phase must be a positive integer"
+      "Invalid --phase. Provide a positive integer (e.g. --phase 3)"
     );
 
     await expect(runCLI(["add:cursor", "phase", "--phase", "-1"])).rejects.toThrow(
-      "--phase must be a positive integer"
+      "Invalid --phase. Provide a positive integer (e.g. --phase 3)"
     );
 
     await expect(runCLI(["add:cursor", "phase", "--phase", "abc"])).rejects.toThrow(
-      "--phase must be a positive integer"
+      "Invalid --phase. Provide a positive integer (e.g. --phase 3)"
     );
   });
 
@@ -207,19 +207,19 @@ describe("add:cursor", () => {
 
   it("rejects invalid names with only special characters", async () => {
     await expect(runCLI(["add:cursor", "rules", "--name", "!!!"])).rejects.toThrow(
-      'Invalid --name. Use kebab-case, e.g. "cursor-rules"'
+      'Invalid --name. Use kebab-case (e.g. "component-rules")'
     );
   });
 
   it("rejects names with uppercase letters", async () => {
     await expect(runCLI(["add:cursor", "rules", "--name", "MyComponent"])).rejects.toThrow(
-      'Invalid --name. Use kebab-case, e.g. "cursor-rules"'
+      'Invalid --name. Use kebab-case (e.g. "component-rules")'
     );
   });
 
   it("rejects names with underscores", async () => {
     await expect(runCLI(["add:cursor", "rules", "--name", "my_component"])).rejects.toThrow(
-      'Invalid --name. Use kebab-case, e.g. "cursor-rules"'
+      'Invalid --name. Use kebab-case (e.g. "component-rules")'
     );
   });
 
