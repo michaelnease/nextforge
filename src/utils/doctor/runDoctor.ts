@@ -7,6 +7,8 @@ export interface DoctorResult {
   title: string;
   status: "pass" | "warn" | "fail";
   message: string;
+  details?: string;
+  fix?: string[];
 }
 
 export interface DoctorFlags {
@@ -30,19 +32,27 @@ export async function runDoctor(flags: DoctorFlags): Promise<number> {
   for (const check of checks) {
     try {
       const res = await check.run(ctx);
-      results.push({
+      const result: DoctorResult = {
         id: check.id,
         title: check.title,
         status: res.status,
         message: res.message,
-      });
+      };
+      if (res.details) result.details = res.details;
+      if (res.fix) result.fix = res.fix;
+      results.push(result);
     } catch (err) {
-      results.push({
+      const error = err as Error;
+      const result: DoctorResult = {
         id: check.id,
         title: check.title,
         status: "fail",
-        message: (err as Error).message,
-      });
+        message: error.message || "Unexpected error during check",
+      };
+      if (flags.verbose) {
+        result.details = String(error.stack || err);
+      }
+      results.push(result);
     }
   }
 

@@ -21,7 +21,10 @@ describe("Config loader E2E tests", () => {
 
   it("loads nextforge.config.ts without warnings", async () => {
     workspace = await makeTempWorkspace();
-    const configPath = path.join(workspace.dir, "nextforge.config.ts");
+
+    // Create package.json first to avoid tsx check failure
+    // (temp workspace has no node_modules, so we use .mjs for this test)
+    const configPath = path.join(workspace.dir, "nextforge.config.mjs");
     await writeFile(
       configPath,
       `export default {

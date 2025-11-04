@@ -1,6 +1,8 @@
-import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
+
+import semver from "semver";
 
 export interface CheckContext {
   cwd: string;
@@ -17,6 +19,8 @@ export interface CheckContext {
 export interface CheckResult {
   status: "pass" | "warn" | "fail";
   message: string;
+  details?: string;
+  fix?: string[];
 }
 
 export interface Check {
@@ -25,29 +29,64 @@ export interface Check {
   run: (ctx: CheckContext) => Promise<CheckResult>;
 }
 
-function ok(msg: string): CheckResult {
-  return { status: "pass", message: msg };
+function ok(msg: string, details?: string): CheckResult {
+  const result: CheckResult = { status: "pass", message: msg };
+  if (details) result.details = details;
+  return result;
 }
 
-function warn(msg: string): CheckResult {
-  return { status: "warn", message: msg };
+function warn(msg: string, opts?: { details?: string; fix?: string[] }): CheckResult {
+  const result: CheckResult = { status: "warn", message: msg };
+  if (opts?.details) result.details = opts.details;
+  if (opts?.fix) result.fix = opts.fix;
+  return result;
 }
 
-function fail(msg: string): CheckResult {
-  return { status: "fail", message: msg };
+function fail(msg: string, opts?: { details?: string; fix?: string[] }): CheckResult {
+  const result: CheckResult = { status: "fail", message: msg };
+  if (opts?.details) result.details = opts.details;
+  if (opts?.fix) result.fix = opts.fix;
+  return result;
+}
+
+/**
+ * Detect if a package is locally installed using Node's module resolution
+ */
+function hasLocal(dep: string, cwd = process.cwd()): boolean {
+  try {
+    const require = createRequire(path.join(cwd, "package.json"));
+    require.resolve(dep);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export const nodeVersionCheck: Check = {
   id: "node-version",
   title: "Node.js version",
-  async run() {
-    const version = process.version;
-    const versionParts = version.replace(/^v/, "").split(".");
-    const major = parseInt(versionParts[0] ?? "0", 10);
-    if (major < 18) {
-      return fail(`Node ${version} is too old. Minimum 18 required.`);
+  async run(ctx: CheckContext) {
+    const v = process.version.replace(/^v/, "");
+    let range = ">=18.0.0";
+
+    try {
+      const pkgPath = path.join(ctx.cwd, "package.json");
+      const pkgContent = await fs.readFile(pkgPath, "utf8");
+      const pkg = JSON.parse(pkgContent);
+      if (pkg.engines?.node) {
+        range = pkg.engines.node;
+      }
+    } catch {
+      // No package.json or can't parse it - use default
     }
-    return ok(`Running Node ${version}`);
+
+    if (!semver.satisfies(v, range)) {
+      return fail(`Node ${v} does not satisfy engines.node "${range}"`, {
+        fix: [`Upgrade Node.js to satisfy "${range}"`, `Use nvm or similar: nvm install ${range}`],
+      });
+    }
+
+    return ok(`Node ${v} satisfies engines.node "${range}"`);
   },
 };
 
@@ -55,129 +94,135 @@ export const tsxLoaderCheck: Check = {
   id: "tsx-loader",
   title: "NextForge config (tsx loader)",
   async run(ctx: CheckContext) {
-    const configTs = path.join(ctx.cwd, "nextforge.config.ts");
-    try {
-      await fs.access(configTs);
-    } catch {
-      return ok("No nextforge.config.ts found");
-    }
+    const cwd = ctx.cwd;
+    const ts = path.join(cwd, "nextforge.config.ts");
+    const mjs = path.join(cwd, "nextforge.config.mjs");
+    const js = path.join(cwd, "nextforge.config.js");
 
-    // Check for package.json
-    const pkgPath = path.join(ctx.cwd, "package.json");
-    let pkgContent: string;
-    try {
-      pkgContent = await fs.readFile(pkgPath, "utf8");
-    } catch {
-      // No package.json - this is fine for test workspaces
-      return ok("nextforge.config.ts found but no package.json (test workspace?)");
-    }
-
-    try {
-      const pkg = JSON.parse(pkgContent);
-      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-
-      if (!deps.tsx) {
-        return fail("nextforge.config.ts found but 'tsx' not installed.");
-      }
-
-      // Try to verify tsx is actually installed
-      // Check node_modules directly for cross-platform compatibility
-      const nodeModulesPath = path.join(ctx.cwd, "node_modules", "tsx");
-      try {
-        await fs.access(nodeModulesPath);
-        return ok("tsx dependency detected and working.");
-      } catch {
-        // Fallback: try to check via package manager (may fail in some environments)
+    const present = await Promise.all(
+      [ts, mjs, js].map(async (p) => {
         try {
-          // Try pnpm first, then npm, then yarn
-          let output = "";
-          try {
-            output = execSync("pnpm ls tsx --depth 0 --json", {
-              cwd: ctx.cwd,
-              encoding: "utf8",
-              stdio: ["ignore", "pipe", "ignore"],
-            });
-          } catch {
-            try {
-              output = execSync("npm ls tsx --depth 0 --json", {
-                cwd: ctx.cwd,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "ignore"],
-              });
-            } catch {
-              output = execSync("yarn list --pattern tsx --depth 0 --json", {
-                cwd: ctx.cwd,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "ignore"],
-              });
-            }
-          }
-
-          if (output && output.includes("tsx")) {
-            return ok("tsx dependency detected and working.");
-          }
-          return fail("tsx package not properly installed or incompatible.");
+          await fs.access(p);
+          return p;
         } catch {
-          // If all checks fail, assume it's installed if listed in package.json
-          return warn("tsx listed in package.json but unable to verify installation.");
+          return null;
         }
+      })
+    ).then((list) => list.filter(Boolean) as string[]);
+
+    if (!present.length) return ok("No nextforge.config.* found");
+
+    if (present.includes(ts)) {
+      // TS config: require tsx locally installed
+      if (!hasLocal("tsx", cwd)) {
+        return fail("Found nextforge.config.ts but 'tsx' is not installed locally.", {
+          fix: [
+            "npm i -D tsx",
+            "or rename the config to .mjs",
+            'or add "type": "module" and use .js',
+          ],
+        });
       }
-    } catch (err) {
-      return fail(`Error verifying tsx: ${(err as Error).message}`);
+      return ok("nextforge.config.ts with local 'tsx' detected.");
     }
+
+    // ESM config: validate Node ESM mode when using .mjs or "type": "module"
+    const firstConfig = present[0];
+    return ok(`Using ${firstConfig ? path.basename(firstConfig) : "config file"}`);
   },
 };
+
+/**
+ * Detect app directory with flexible fallbacks
+ */
+async function detectAppDir(cwd: string, preferred?: string): Promise<string | null> {
+  const candidates: string[] = [];
+  const pushIfDir = async (p: string) => {
+    try {
+      const stats = await fs.stat(p);
+      if (stats.isDirectory()) candidates.push(p);
+    } catch {
+      // Directory doesn't exist
+    }
+  };
+
+  // If user provided a preferred path, validate it
+  if (preferred) {
+    const resolved = path.resolve(cwd, preferred);
+    await pushIfDir(resolved);
+    return candidates[0] ?? null;
+  }
+
+  // Check if Nx monorepo
+  const nxJsonPath = path.join(cwd, "nx.json");
+  let hasNx = false;
+  try {
+    await fs.access(nxJsonPath);
+    hasNx = true;
+  } catch {
+    // Not an Nx workspace
+  }
+
+  if (hasNx) {
+    // Lightweight globbing for Nx workspaces
+    const appsDir = path.join(cwd, "apps");
+    try {
+      const apps = await fs.readdir(appsDir);
+      for (const a of apps) {
+        await pushIfDir(path.join(appsDir, a, "app"));
+        await pushIfDir(path.join(appsDir, a, "src", "app"));
+      }
+    } catch {
+      // apps directory doesn't exist
+    }
+  }
+
+  // Try monorepo-lite defaults
+  await pushIfDir(path.join(cwd, "app"));
+  await pushIfDir(path.join(cwd, "src", "app"));
+
+  return candidates[0] ?? null;
+}
 
 export const appDirCheck: Check = {
   id: "app-dir",
   title: "Next.js app directory",
   async run(ctx: CheckContext) {
-    // If user specified an app path, check only that
-    if (ctx.flags.app) {
-      const appPath = path.isAbsolute(ctx.flags.app)
-        ? ctx.flags.app
-        : path.join(ctx.cwd, ctx.flags.app);
+    const found = await detectAppDir(ctx.cwd, ctx.flags.app);
+
+    if (!found) {
+      // Check if this is a Next.js project before failing hard
+      let isNextProject = false;
       try {
-        await fs.access(appPath);
-        return ok(`Found app directory at ${ctx.flags.app}`);
+        const pkgPath = path.join(ctx.cwd, "package.json");
+        const pkgContent = await fs.readFile(pkgPath, "utf8");
+        const pkg = JSON.parse(pkgContent);
+        const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+        isNextProject = Boolean(deps.next);
       } catch {
-        return fail(`App directory not found at ${ctx.flags.app}`);
+        // No package.json or can't read it
       }
-    }
 
-    // Otherwise, check common locations
-    const commonLocations = ["app", "apps/web/app", "src/app", "apps/next/app"];
-    for (const loc of commonLocations) {
-      const appPath = path.join(ctx.cwd, loc);
-      try {
-        await fs.access(appPath);
-        return ok(`Found app directory at ${loc}`);
-      } catch {
-        // Continue to next location
+      if (isNextProject) {
+        return fail(
+          "No Next.js app directory found. Pass --app <path> or create an app/ folder (or apps/<name>/app in Nx).",
+          {
+            fix: [
+              "Pass --app <path> to specify the app directory",
+              "Create an app/ or src/app/ folder",
+              "In Nx: create apps/<name>/app",
+            ],
+          }
+        );
       }
-    }
 
-    // Check if we're in a Next.js project context before warning
-    let isNextProject = false;
-    try {
-      const pkgPath = path.join(ctx.cwd, "package.json");
-      const pkgContent = await fs.readFile(pkgPath, "utf8");
-      const pkg = JSON.parse(pkgContent);
-      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      isNextProject = Boolean(deps.next);
-    } catch {
-      // No package.json or can't read it - assume not a Next.js project
-    }
-
-    // Only warn if we're in a Next.js project but no app directory found
-    if (isNextProject) {
+      // Not a Next.js project, so just warn
       return warn(
-        `No app directory found in common locations (${commonLocations.join(", ")}). Use --app to specify.`
+        "No Next.js app directory found (not a Next.js project or missing 'next' dependency)."
       );
     }
 
-    // Not a Next.js project, so this check doesn't apply
-    return ok("Not a Next.js project (no 'next' in package.json), skipping app directory check");
+    return ok(`Found app directory at ${path.relative(ctx.cwd, found)}`);
   },
 };
 
@@ -185,11 +230,30 @@ export const zshQuotingCheck: Check = {
   id: "zsh-quoting",
   title: "zsh quoting issues",
   async run() {
-    if (!process.env.SHELL?.includes("zsh")) {
+    const shell = process.env.SHELL || "";
+    if (!/zsh/.test(shell)) {
       return ok("Not running zsh");
     }
+
+    // Check for setopt no_nomatch in .zshrc
+    try {
+      const home = process.env.HOME;
+      if (home) {
+        const zshrcPath = path.join(home, ".zshrc");
+        const zshrc = await fs.readFile(zshrcPath, "utf8");
+        if (/setopt\s+no_nomatch/.test(zshrc)) {
+          return ok("zsh with no_nomatch configured; bracket args are safe.");
+        }
+      }
+    } catch {
+      // .zshrc unreadable or doesn't exist - treat as best-effort
+    }
+
     return warn(
-      'Detected zsh. Remember to quote page args like: npx nextforge add:group auth --pages "signin,signup,[slug]"'
+      'Detected zsh. Quote page args to avoid globbing: `--pages "signin,signup,[slug]"`',
+      {
+        fix: ["Add to ~/.zshrc: setopt no_nomatch", "Or always quote bracket arguments"],
+      }
     );
   },
 };
