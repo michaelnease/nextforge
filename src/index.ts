@@ -93,3 +93,7 @@ export async function main(): Promise<void> {
 
   await program.parseAsync(process.argv);
 }
+
+// Export programmatic API for parent apps
+export { createCursorRules, createCursorPhase } from "./api/cursor.js";
+export type { CreateCursorRulesOptions, CreateCursorPhaseOptions } from "./api/cursor.js";

@@ -8,35 +8,16 @@ export function phaseTemplate({ phase, format }: PhaseTemplateInput): string {
     return (
       JSON.stringify(
         {
-          $schema: "https://cursor.directory/schema.json",
+          $schema: "https://schemas.nextforge.dev/cursor-phase.v1.json",
           phase,
           title: `Phase ${phase}`,
-          goal: `Complete Phase ${phase} of the NextForge implementation`,
-          checklist: [
-            "Review phase requirements",
-            "Gather necessary context",
-            "Implement changes",
-            "Run tests",
-            "Update documentation",
-          ],
-          inputs: ["Requirements document", "Previous phase deliverables", "Codebase context"],
-          deliverables: [
-            "Implemented features",
-            "Test coverage",
-            "Documentation updates",
-            "Code review",
-          ],
+          version: 1,
           steps: [
-            "Review the requirements for this phase",
-            "Implement the necessary changes",
+            "Review phase requirements and gather context",
+            "Implement necessary changes following NextForge conventions",
             "Run tests to verify correctness",
-            "Update documentation",
-          ],
-          validation: [
-            "All tests pass",
-            "Build completes without errors",
-            "Generated files follow conventions",
-            "Documentation is updated",
+            "Update documentation and add inline comments",
+            "Create pull request with comprehensive description",
           ],
         },
         null,
@@ -47,9 +28,10 @@ export function phaseTemplate({ phase, format }: PhaseTemplateInput): string {
 
   // MDX format
   return `---
+type: phase
 phase: ${phase}
 title: Phase ${phase}
-tags: [cursor, phase]
+version: 1
 ---
 
 <!--
@@ -97,6 +79,7 @@ Complete Phase ${phase} of the NextForge implementation.
 2. Implement the necessary changes
 3. Run tests to verify correctness
 4. Update documentation
+5. Create pull request
 
 ## Cursor Prompt Example
 
