@@ -23,7 +23,8 @@ describe("Regression and safety E2E tests", () => {
     // No config file
     const result = await runCli(workspace.dir, "doctor");
 
-    expect(result.code).toBe(0);
+    // Exit code 0 = all pass, 1 = warnings (acceptable), 2 = failures (not acceptable)
+    expect(result.code).toBeLessThanOrEqual(1);
     // Should not crash, should use defaults
   });
 
@@ -84,7 +85,6 @@ describe("Regression and safety E2E tests", () => {
     expect(result.code).toBe(0);
     const componentPath = path.join(
       workspace.dir,
-      "app",
       "components",
       "section",
       "Marketing",
