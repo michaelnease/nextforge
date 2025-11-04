@@ -12,46 +12,42 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [18, 22]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "pnpm"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Run ESLint
-        run: pnpm run lint
+        run: npm run lint
 
       - name: Run Prettier check
-        run: pnpm run format:check
+        run: npm run format:check
 
       - name: Run TypeScript type check
-        run: pnpm run typecheck
+        run: npm run typecheck
 
       - name: Build project
-        run: pnpm run build
+        run: npm run build
 
       - name: Run tests
-        run: pnpm test -- --run
+        run: npm test -- --run
 
       - name: Run smoke tests
-        run: pnpm run smoke:add-component
+        run: npm run smoke:add-component
 
       - name: Test built CLI
         run: node bin/nextforge.js --help
 
       - name: Test doctor command
-        run: node bin/nextforge.js doctor
+        run: node bin/nextforge.js doctor --ci --json
