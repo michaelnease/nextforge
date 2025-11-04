@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { exists, makeTempWorkspace, readText, runCli } from "../utils/tempWorkspace.js";
+import { exists, makeTempWorkspace, readText, runCli, writeJson } from "../utils/tempWorkspace.js";
 
 describe("Core CLI smoke tests", () => {
   let workspace: Awaited<ReturnType<typeof makeTempWorkspace>>;
@@ -34,23 +34,30 @@ describe("Core CLI smoke tests", () => {
     workspace = await makeTempWorkspace();
     const result = await runCli(workspace.dir, "doctor");
 
-    expect(result.code).toBe(0);
-    // Doctor command uses ora spinner which outputs to stderr or stdout
+    // Exit code 0 = all pass, 1 = warnings (acceptable), 2 = failures (not acceptable)
+    expect(result.code).toBeLessThanOrEqual(1);
+    // Doctor command outputs report to stdout
     const output = (result.stdout + result.stderr).toLowerCase();
-    expect(output).toMatch(/doctor.*running/i);
+    expect(output).toMatch(/doctor/i);
+    expect(output).toMatch(/report|check|node\.js|next\.js/i);
   });
 
-  it("init creates nextforge.config.ts in temp workspace", async () => {
+  it("init creates nextforge config in temp workspace", async () => {
     workspace = await makeTempWorkspace();
-    const result = await runCli(workspace.dir, "init");
+    // Create a minimal package.json to trigger .mjs creation
+    await writeJson(path.join(workspace.dir, "package.json"), {
+      name: "test",
+      type: "module",
+    });
+    const result = await runCli(workspace.dir, "init", "--yes");
 
     expect(result.code).toBe(0);
-    const configPath = path.join(workspace.dir, "nextforge.config.ts");
+    const configPath = path.join(workspace.dir, "nextforge.config.mjs");
     expect(await exists(configPath)).toBe(true);
 
     const content = await readText(configPath);
     expect(content).toContain("useTailwind");
-    expect(content).toContain("pagesDir");
+    expect(content).toContain("appDir");
   });
 
   it("no Node warnings about MODULE_TYPELESS_PACKAGE_JSON appear in stderr", async () => {

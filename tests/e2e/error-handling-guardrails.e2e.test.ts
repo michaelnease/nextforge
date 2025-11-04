@@ -35,7 +35,7 @@ describe("Error handling and guardrails", () => {
       // Create twice
       await runCli(workspace.dir, ["add:component", "ui/Button"]);
 
-      const barrel = await readText(path.join(workspace.dir, "app/components/ui/index.ts"));
+      const barrel = await readText(path.join(workspace.dir, "components/ui/index.ts"));
 
       // Appears exactly once
       const matches = barrel.match(/export \* from '\.\/Button'/g) ?? [];
@@ -45,7 +45,7 @@ describe("Error handling and guardrails", () => {
     });
 
     it("add:component with --force overwrites component file", async () => {
-      const p = path.join(workspace.dir, "app/components/ui/Button/Button.tsx");
+      const p = path.join(workspace.dir, "components/ui/Button/Button.tsx");
       await writeFile(p, "// custom");
 
       await runCli(workspace.dir, ["add:component", "ui/Button", "--force"]);
@@ -66,7 +66,7 @@ describe("Error handling and guardrails", () => {
     });
 
     it("add:component without --force skips existing file", async () => {
-      const p = path.join(workspace.dir, "app/components/ui/Button/Button.tsx");
+      const p = path.join(workspace.dir, "components/ui/Button/Button.tsx");
       await writeFile(p, "// custom component");
 
       await runCli(workspace.dir, ["add:component", "ui/Button"]);
@@ -270,7 +270,7 @@ describe("Error handling and guardrails", () => {
       ]);
 
       expect(result.code).toBe(0);
-      const componentPath = path.join(workspace.dir, "app/components/ui/Card/Card.tsx");
+      const componentPath = path.join(workspace.dir, "components/ui/Card/Card.tsx");
       const content = await readText(componentPath);
       // Should have Tailwind className even though config says no Tailwind
       expect(content).toContain("className");
@@ -295,9 +295,7 @@ describe("Error handling and guardrails", () => {
 
         await runCli(workspace.dir, ["add:component", `${group}/Card`]);
 
-        const code = await readText(
-          path.join(workspace.dir, `app/components/${group}/Card/Card.tsx`)
-        );
+        const code = await readText(path.join(workspace.dir, `components/${group}/Card/Card.tsx`));
 
         if (useTailwind) {
           expect(code).toMatch(/className="[^"]*"/);
@@ -367,7 +365,6 @@ describe("Error handling and guardrails", () => {
         workspace.dir,
         "apps",
         "web",
-        "app",
         "components",
         "ui",
         "Button",
@@ -382,7 +379,7 @@ describe("Error handling and guardrails", () => {
       await runCli(workspace.dir, ["add:component", "ui/Button"]);
       await runCli(workspace.dir, ["add:component", "ui/Card"]);
 
-      const barrel = await readText(path.join(workspace.dir, "app/components/ui/index.ts"));
+      const barrel = await readText(path.join(workspace.dir, "components/ui/index.ts"));
 
       // Check that each component appears exactly once
       const buttonMatches = barrel.match(/Button/g) || [];
@@ -397,7 +394,7 @@ describe("Error handling and guardrails", () => {
       await runCli(workspace.dir, ["add:component", "ui/Alpha"]);
       await runCli(workspace.dir, ["add:component", "ui/Middle"]);
 
-      const barrel = await readText(path.join(workspace.dir, "app/components/ui/index.ts"));
+      const barrel = await readText(path.join(workspace.dir, "components/ui/index.ts"));
 
       // Get all export lines
       const lines = barrel.split("\n").filter((l) => l.trim().startsWith("export"));
@@ -413,7 +410,7 @@ describe("Error handling and guardrails", () => {
     it("re-running add:component does not duplicate barrel exports", async () => {
       await runCli(workspace.dir, ["add:component", "ui/Button"]);
 
-      const barrel1 = await readText(path.join(workspace.dir, "app/components/ui/index.ts"));
+      const barrel1 = await readText(path.join(workspace.dir, "components/ui/index.ts"));
       const exportCount1 = barrel1
         .split("\n")
         .filter((l) => l.includes("export") && l.includes("Button")).length;
@@ -421,7 +418,7 @@ describe("Error handling and guardrails", () => {
       // Run again (should not duplicate)
       await runCli(workspace.dir, ["add:component", "ui/Button"]);
 
-      const barrel2 = await readText(path.join(workspace.dir, "app/components/ui/index.ts"));
+      const barrel2 = await readText(path.join(workspace.dir, "components/ui/index.ts"));
       const exportCount2 = barrel2
         .split("\n")
         .filter((l) => l.includes("export") && l.includes("Button")).length;
@@ -472,7 +469,7 @@ describe("Error handling and guardrails", () => {
 
       for (const fw of frameworks) {
         // Clean up previous runs
-        const componentPath = path.join(workspace.dir, "app/components/ui/Test", "Test.tsx");
+        const componentPath = path.join(workspace.dir, "components/ui/Test", "Test.tsx");
         await import("fs/promises").then((fs) =>
           fs.rm(path.dirname(componentPath), { recursive: true, force: true })
         );
@@ -489,7 +486,7 @@ describe("Error handling and guardrails", () => {
       const result = await runCli(workspace.dir, ["add:component", "Button", "--group", "invalid"]);
 
       expect(result.code).not.toBe(0);
-      expect(result.stderr + result.stdout).toMatch(/Invalid --group/i);
+      expect(result.stderr + result.stdout).toMatch(/Invalid --type\/--group/i);
     });
 
     it("accepts valid --group values", async () => {

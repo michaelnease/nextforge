@@ -41,10 +41,10 @@ describe("add:component", () => {
     // Run without --app so pagesDir wins
     await runCLI(["add:component", "Button", "--group", "ui"]);
 
-    const files = await readTree(ws.dir, "src/app/components/ui/Button");
+    const files = await readTree(ws.dir, "src/components/ui/Button");
     expect(files).toEqual(["Button.tsx", "index.ts"]);
 
-    const code = await readText("src/app/components/ui/Button/Button.tsx");
+    const code = await readText("src/components/ui/Button/Button.tsx");
     expect(code).toContain('className="p-6"');
     expect(code).not.toContain("@chakra-ui/react");
   });
@@ -67,10 +67,10 @@ describe("add:component", () => {
       "app",
     ]);
 
-    const code = await readText("app/components/ui/Card/Card.tsx");
+    const code = await readText("components/ui/Card/Card.tsx");
     expect(code).toContain("@chakra-ui/react");
 
-    const barrel = await readText("app/components/ui/index.ts");
+    const barrel = await readText("components/ui/index.ts");
     expect(barrel).toContain('export { default as Card } from "Card/Card";');
   });
 
@@ -83,7 +83,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Shell", "--group", "layout", "--client", "--app", "app"]);
 
-    const code = await readText("app/components/layout/Shell/Shell.tsx");
+    const code = await readText("components/layout/Shell/Shell.tsx");
     expect(code.startsWith(`"use client"`)).toBe(true);
     expect(code).toContain("children: ReactNode");
     expect(code).toContain("Container");
@@ -99,7 +99,7 @@ describe("add:component", () => {
     await runCLI(["add:component", "marketing/Hero", "--group", "section", "--app", "app"]);
     await runCLI(["add:component", "marketing/Hero", "--group", "section", "--app", "app"]);
 
-    const tree = await readTree(ws.dir, "app/components/section");
+    const tree = await readTree(ws.dir, "components/section");
     expect(tree).toEqual([
       "Marketing/",
       "Marketing/Hero/",
@@ -108,7 +108,7 @@ describe("add:component", () => {
       "index.ts",
     ]);
 
-    const barrel = await readText("app/components/section/index.ts");
+    const barrel = await readText("components/section/index.ts");
     const needle = 'export { default as Hero } from "Marketing/Hero/Hero";';
     const count = (
       barrel.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []
@@ -128,7 +128,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Card", "--group", "ui", "--client", "--app", "app"]);
 
-    const text = await readText("app/components/ui/Card/Card.tsx");
+    const text = await readText("components/ui/Card/Card.tsx");
     expect(text.startsWith('"use client"')).toBe(true);
     expect(text).toMatch(/import { Box, Heading, Text } from "@chakra-ui\/react"/);
   });
@@ -143,7 +143,7 @@ describe("add:component", () => {
     await runCLI(["add:component", "Badge", "--group", "ui", "--with-style", "--app", "app"]);
 
     const cssExists = await fs
-      .access("app/components/ui/Badge/Badge.module.css")
+      .access("components/ui/Badge/Badge.module.css")
       .then(() => true)
       .catch(() => false);
     expect(cssExists).toBe(false);
@@ -158,7 +158,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Badge", "--group", "ui", "--with-style", "--app", "app"]);
 
-    const css = await readText("app/components/ui/Badge/Badge.module.css");
+    const css = await readText("components/ui/Badge/Badge.module.css");
     expect(css).toContain(".container");
   });
 
@@ -171,7 +171,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Card", "--group", "ui", "--with-style", "--app", "app"]);
 
-    const styles = await readText("app/components/ui/Card/Card.styles.ts");
+    const styles = await readText("components/ui/Card/Card.styles.ts");
     expect(styles).toContain("SystemStyleObject");
     expect(styles).toContain("CardStyles");
   });
@@ -185,7 +185,7 @@ describe("add:component", () => {
 
     await expect(
       runCLI(["add:component", "Button", "--group", "invalid", "--app", "app"])
-    ).rejects.toThrow(/Invalid --group/);
+    ).rejects.toThrow(/Invalid --type\/--group/);
   });
 
   it("validates invalid component name starting with number", async () => {
@@ -208,10 +208,10 @@ describe("add:component", () => {
     );
 
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
-    const first = await readText("app/components/ui/Button/Button.tsx");
+    const first = await readText("components/ui/Button/Button.tsx");
 
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app", "--force"]);
-    const second = await readText("app/components/ui/Button/Button.tsx");
+    const second = await readText("components/ui/Button/Button.tsx");
 
     expect(first).toBe(second); // Should be overwritten (same template)
   });
@@ -225,7 +225,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
 
-    const text = await readText("app/components/ui/Button/Button.tsx");
+    const text = await readText("components/ui/Button/Button.tsx");
     expect(text.startsWith('"use client"')).toBe(false);
   });
 
@@ -239,7 +239,7 @@ describe("add:component", () => {
     for (const group of ["ui", "layout", "section", "feature"]) {
       await runCLI(["add:component", `Test${group}`, "--group", group, "--app", "app"]);
       const exists = await fs
-        .access(`app/components/${group}/Test${group}/Test${group}.tsx`)
+        .access(`components/${group}/Test${group}/Test${group}.tsx`)
         .then(() => true)
         .catch(() => false);
       expect(exists).toBe(true);
@@ -266,7 +266,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Card", "--group", "ui", "--with-story", "--app", "app"]);
 
-    const story = await readText("app/components/ui/Card/Card.stories.tsx");
+    const story = await readText("components/ui/Card/Card.stories.tsx");
     expect(story).toContain('title: "components/ui/Card"');
     expect(story).toContain("satisfies Meta");
     expect(story).toContain("type Story = StoryObj<typeof meta>");
@@ -298,7 +298,7 @@ describe("add:component", () => {
     await runCLI(["add:component", "Badge", "--group", "ui", "--with-style", "--app", "app"]);
 
     const cssExists = await fs
-      .access("app/components/ui/Badge/Badge.module.css")
+      .access("components/ui/Badge/Badge.module.css")
       .then(() => true)
       .catch(() => false);
     expect(cssExists).toBe(false);
@@ -313,7 +313,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Hybrid", "--group", "ui", "--app", "app"]);
 
-    const code = await readText("app/components/ui/Hybrid/Hybrid.tsx");
+    const code = await readText("components/ui/Hybrid/Hybrid.tsx");
     expect(code).toContain("@chakra-ui/react");
     expect(code).toContain('className="');
     expect(code).toContain("Box");
@@ -337,7 +337,7 @@ describe("add:component", () => {
       "app",
     ]);
 
-    const code = await readText("app/components/ui/Hybrid/Hybrid.tsx");
+    const code = await readText("components/ui/Hybrid/Hybrid.tsx");
     expect(code).toContain("@chakra-ui/react");
     expect(code).toContain('className="');
     expect(code).toContain("Box");
@@ -357,7 +357,7 @@ describe("add:component", () => {
 
     // First run
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
-    const barrel1 = await readText("app/components/ui/index.ts");
+    const barrel1 = await readText("components/ui/index.ts");
     const count1 = (barrel1.match(/export \{ default as Button \}/g) || []).length;
     // Verify POSIX path is used (forward slashes)
     expect(barrel1).toMatch(/export.*from.*["'].*Button\/Button["']/);
@@ -365,7 +365,7 @@ describe("add:component", () => {
 
     // Second run - should not duplicate
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
-    const barrel2 = await readText("app/components/ui/index.ts");
+    const barrel2 = await readText("components/ui/index.ts");
     const count2 = (barrel2.match(/export \{ default as Button \}/g) || []).length;
 
     // Should have exactly one export line
@@ -385,8 +385,8 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
 
-    const component = await readText("app/components/ui/Button/Button.tsx");
-    const index = await readText("app/components/ui/Button/index.ts");
+    const component = await readText("components/ui/Button/Button.tsx");
+    const index = await readText("components/ui/Button/index.ts");
     expect(component.endsWith("\n")).toBe(true);
     expect(index.endsWith("\n")).toBe(true);
   });
@@ -400,7 +400,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
 
-    const barrel = await readText("app/components/ui/index.ts");
+    const barrel = await readText("components/ui/index.ts");
     // POSIX paths use forward slashes, even on Windows
     expect(barrel).not.toContain("\\");
     // Verify forward slashes are used in import paths
@@ -426,7 +426,7 @@ describe("add:component", () => {
       "app",
     ]);
 
-    const code = await readText("app/components/ui/Test/Test.tsx");
+    const code = await readText("components/ui/Test/Test.tsx");
     expect(code).toContain("@chakra-ui/react");
     expect(code).toContain("Box");
     expect(code).not.toContain('className="p-6"'); // Should be Chakra, not Tailwind
@@ -453,7 +453,7 @@ describe("add:component", () => {
 
     await runCLI(["add:component", "Counter", "--group", "ui", "--client", "--app", "app"]);
 
-    const txt = await readText("app/components/ui/Counter/Counter.tsx");
+    const txt = await readText("components/ui/Counter/Counter.tsx");
     // Verify exactly first line is "use client" with no leading whitespace or comments
     expect(txt.split(/\r?\n/, 1)[0]).toBe('"use client";');
     // Also verify it's the very first character of the file
@@ -469,16 +469,16 @@ describe("add:component", () => {
 
     // Create component first time
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
-    const firstCode = await readText("app/components/ui/Button/Button.tsx");
+    const firstCode = await readText("components/ui/Button/Button.tsx");
 
     // Try to create again without --force (should skip)
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
-    const secondCode = await readText("app/components/ui/Button/Button.tsx");
+    const secondCode = await readText("components/ui/Button/Button.tsx");
     expect(firstCode).toBe(secondCode); // Should be unchanged
 
     // Create with --force (should overwrite)
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app", "--force"]);
-    const thirdCode = await readText("app/components/ui/Button/Button.tsx");
+    const thirdCode = await readText("components/ui/Button/Button.tsx");
     expect(thirdCode).toBe(firstCode); // Should be overwritten (same template)
   });
 
@@ -501,8 +501,8 @@ describe("add:component", () => {
       "app",
     ]);
 
-    const stylePath = "app/components/ui/Card/Card.styles.ts";
-    const storyPath = "app/components/ui/Card/Card.stories.tsx";
+    const stylePath = "components/ui/Card/Card.styles.ts";
+    const storyPath = "components/ui/Card/Card.stories.tsx";
     const firstStyle = await readText(stylePath);
     const firstStory = await readText(storyPath);
 
