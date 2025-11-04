@@ -69,10 +69,10 @@ async function testConfig(name, config, variantDir, repoRoot) {
     throw err;
   }
 
-  // Assert files exist
-  const componentPath = path.join(variantDir, "app", "components", "ui", "Button", "Button.tsx");
-  const indexPath = path.join(variantDir, "app", "components", "ui", "Button", "index.ts");
-  const testPath = path.join(variantDir, "app", "components", "ui", "Button", "Button.test.tsx");
+  // Assert files exist (components are now siblings to app, not children)
+  const componentPath = path.join(variantDir, "components", "ui", "Button", "Button.tsx");
+  const indexPath = path.join(variantDir, "components", "ui", "Button", "index.ts");
+  const testPath = path.join(variantDir, "components", "ui", "Button", "Button.test.tsx");
 
   await assertFileExists(componentPath, "Component file");
   await assertFileExists(indexPath, "Index file");
@@ -85,7 +85,7 @@ async function testConfig(name, config, variantDir, repoRoot) {
   }
 
   // Assert barrel file contains correct export line (POSIX path normalization)
-  const barrelPath = path.join(variantDir, "app", "components", "ui", "index.ts");
+  const barrelPath = path.join(variantDir, "components", "ui", "index.ts");
   const barrelContent = await fs.readFile(barrelPath, "utf8");
   if (!barrelContent.includes("export { default as Button }")) {
     throw new Error("Barrel file missing export line");

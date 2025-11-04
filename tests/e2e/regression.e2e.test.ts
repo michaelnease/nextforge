@@ -85,7 +85,6 @@ describe("Regression and safety E2E tests", () => {
     expect(result.code).toBe(0);
     const componentPath = path.join(
       workspace.dir,
-      "app",
       "components",
       "section",
       "Marketing",

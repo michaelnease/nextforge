@@ -117,6 +117,7 @@ export const tsxLoaderCheck: Check = {
       if (!hasLocal("tsx", cwd)) {
         return fail("Found nextforge.config.ts but 'tsx' is not installed locally.", {
           fix: [
+            "Run: npx nextforge init --yes --force (to regenerate and install tsx)",
             "npm i -D tsx",
             "or rename the config to .mjs",
             'or add "type": "module" and use .js',

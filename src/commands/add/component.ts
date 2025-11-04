@@ -46,9 +46,13 @@ export const Primary: Story = {};
 export function registerAddComponent(program: Command) {
   program
     .command("add:component")
-    .description("Create a component in <app>/components/<group>/<Name>")
+    .description("Create a component in components/<type>/<Name> (sibling to app directory)")
     .argument("<target>", "Component name, e.g. Button or ui/Button")
-    .option("--group <group>", "Component group: ui | layout | section | feature")
+    .option("--type <kind>", "Component type: ui | layout | section | feature")
+    .option(
+      "--group <group>",
+      "Component group: ui | layout | section | feature (alias for --type)"
+    )
     .option("--app <dir>", "App directory")
     .option("--framework <value>", "Framework: react | next")
     .option("--force", "Overwrite existing files", false)
@@ -60,6 +64,7 @@ export function registerAddComponent(program: Command) {
       async (
         target: string,
         opts: {
+          type?: string;
           group?: string;
           app?: string;
           framework?: string;
@@ -100,35 +105,36 @@ export function registerAddComponent(program: Command) {
         const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
         if (parts.length === 1) {
-          // Simple case: "Button" with --group flag
+          // Simple case: "Button" with --type or --group flag
           componentName = parts[0]!;
-          group = (opts.group || "ui") as Group;
+          // --type takes precedence over --group for backward compatibility
+          group = (opts.type || opts.group || "ui") as Group;
         } else if (parts.length === 2) {
           // Two parts: could be "ui/Button" (group/name) or treated as nested
           const [first, second] = parts;
           const VALID_GROUPS = new Set(["ui", "layout", "section", "feature"]);
 
-          if (VALID_GROUPS.has(first!) && !opts.group) {
+          if (VALID_GROUPS.has(first!) && !opts.type && !opts.group) {
             // First part is a valid group: "ui/Button"
             group = first! as Group;
             componentName = second!;
           } else {
             // First part is a subdirectory: "marketing/Hero" -> "Marketing/Hero"
-            group = (opts.group || "ui") as Group;
+            group = (opts.type || opts.group || "ui") as Group;
             nestedPath = capitalize(first!);
             componentName = second!;
           }
         } else {
           // More than 2 parts: nested subdirectories - capitalize each segment
           componentName = parts[parts.length - 1]!;
-          group = (opts.group || "ui") as Group;
+          group = (opts.type || opts.group || "ui") as Group;
           nestedPath = parts.slice(0, -1).map(capitalize).join("/");
         }
 
         // Validations - throw errors for test harness
         const VALID_GROUPS = new Set(["ui", "layout", "section", "feature"]);
         if (!VALID_GROUPS.has(group)) {
-          throw new Error("Invalid --group. Use ui | layout | feature | section.");
+          throw new Error("Invalid --type/--group. Use ui | layout | section | feature.");
         }
 
         if (!/^[A-Z][A-Za-z0-9]*$/.test(componentName)) {
@@ -142,10 +148,19 @@ export function registerAddComponent(program: Command) {
         );
         const fw = flagsFrom(framework);
 
+        // Compute components directory as sibling to app directory
+        // Examples:
+        // - appRoot: "app" → componentsRoot: "components"
+        // - appRoot: "src/app" → componentsRoot: "src/components"
+        // - appRoot: "apps/web/app" → componentsRoot: "apps/web/components"
+        const appParent = path.dirname(appRoot);
+        const componentsRoot =
+          appParent === "." ? "components" : path.join(appParent, "components");
+
         // Paths - include nested path if present
         const base = nestedPath
-          ? path.join(appRoot, "components", group, nestedPath, componentName)
-          : path.join(appRoot, "components", group, componentName);
+          ? path.join(componentsRoot, group, nestedPath, componentName)
+          : path.join(componentsRoot, group, componentName);
         await ensureDir(base);
 
         // Component file
@@ -193,7 +208,7 @@ export function registerAddComponent(program: Command) {
         // Per-kind barrel - include nested path if present
         const barrelComponentPath = nestedPath ? `${nestedPath}/${componentName}` : componentName;
         await updateKindBarrel(
-          path.join(appRoot, "components", group, "index.ts"),
+          path.join(componentsRoot, group, "index.ts"),
           barrelComponentPath,
           componentName
         );
