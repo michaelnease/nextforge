@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import semver from "semver";
+import { satisfies } from "semver";
 
 export interface CheckContext {
   cwd: string;
@@ -80,7 +80,7 @@ export const nodeVersionCheck: Check = {
       // No package.json or can't parse it - use default
     }
 
-    if (!semver.satisfies(v, range)) {
+    if (!satisfies(v, range)) {
       return fail(`Node ${v} does not satisfy engines.node "${range}"`, {
         fix: [`Upgrade Node.js to satisfy "${range}"`, `Use nvm or similar: nvm install ${range}`],
       });
