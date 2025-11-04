@@ -7,7 +7,7 @@ import { registerAddDocker } from "./commands/add/docker.js";
 import { registerAddGroup } from "./commands/add/group.js";
 import { registerAddPage } from "./commands/add/page.js";
 import { doctorCommand } from "./commands/doctor.js";
-import { registerInit } from "./commands/init.js";
+import { initCommand } from "./commands/init.js";
 
 /**
  * Pre-parse argv to expand comma-joined tokens while preserving quoted strings.
@@ -83,10 +83,10 @@ export async function main(): Promise<void> {
 
   // [nextforge.register:commands:start]
   program.addCommand(doctorCommand);
+  program.addCommand(initCommand);
   registerAddGroup(program);
   registerAddPage(program);
   registerAddDocker(program);
-  registerInit(program);
   registerAddComponent(program);
   registerAddCursor(program);
   // [nextforge.register:commands:end]

@@ -34,7 +34,7 @@ describe("Config precedence E2E tests", () => {
     const result = await runCli(workspace.dir, "add:component", "Test", "--group", "ui");
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(workspace.dir, "app", "components", "ui", "Test", "Test.tsx");
+    const componentPath = path.join(workspace.dir, "components", "ui", "Test", "Test.tsx");
     const content = await readText(componentPath);
     // Basic template should not have Tailwind classes or Chakra imports
     expect(content).not.toContain("className");
@@ -66,7 +66,7 @@ describe("Config precedence E2E tests", () => {
     );
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(workspace.dir, "app", "components", "ui", "Test", "Test.tsx");
+    const componentPath = path.join(workspace.dir, "components", "ui", "Test", "Test.tsx");
     const content = await readText(componentPath);
     // --framework flag should override config
     expect(content).toContain("className");
@@ -95,7 +95,7 @@ describe("Config precedence E2E tests", () => {
     );
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(workspace.dir, "app", "components", "ui", "Test", "Test.tsx");
+    const componentPath = path.join(workspace.dir, "components", "ui", "Test", "Test.tsx");
     const content = await readText(componentPath);
     // CLI flag should override config
     expect(content).toContain("@chakra-ui/react");
@@ -116,7 +116,6 @@ describe("Config precedence E2E tests", () => {
     expect(result1.code).toBe(0);
     const tailwindPath = path.join(
       workspace.dir,
-      "app",
       "components",
       "ui",
       "Tailwindcomp",
@@ -136,14 +135,7 @@ describe("Config precedence E2E tests", () => {
       "ui"
     );
     expect(result2.code).toBe(0);
-    const chakraPath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "ui",
-      "Chakracomp",
-      "Chakracomp.tsx"
-    );
+    const chakraPath = path.join(workspace.dir, "components", "ui", "Chakracomp", "Chakracomp.tsx");
     const chakraContent = await readText(chakraPath);
     expect(chakraContent).toContain("@chakra-ui/react");
   });

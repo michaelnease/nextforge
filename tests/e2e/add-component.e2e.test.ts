@@ -24,16 +24,9 @@ describe("add:component command E2E tests", () => {
     const result = await runCli(workspace.dir, "add:component", "Button", "--group", "ui");
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "ui",
-      "Button",
-      "Button.tsx"
-    );
+    const componentPath = path.join(workspace.dir, "components", "ui", "Button", "Button.tsx");
     expect(await exists(componentPath)).toBe(true);
-    const indexPath = path.join(workspace.dir, "app", "components", "ui", "index.ts");
+    const indexPath = path.join(workspace.dir, "components", "ui", "index.ts");
     expect(await exists(indexPath)).toBe(true);
     const barrelContent = await readText(indexPath);
     expect(barrelContent).toContain("export");
@@ -44,14 +37,7 @@ describe("add:component command E2E tests", () => {
     const result = await runCli(workspace.dir, "add:component", "Shell", "--group", "layout");
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "layout",
-      "Shell",
-      "Shell.tsx"
-    );
+    const componentPath = path.join(workspace.dir, "components", "layout", "Shell", "Shell.tsx");
     expect(await exists(componentPath)).toBe(true);
     const content = await readText(componentPath);
     expect(content).toContain("children");
@@ -61,14 +47,7 @@ describe("add:component command E2E tests", () => {
     const result = await runCli(workspace.dir, "add:component", "Hero", "--group", "section");
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "section",
-      "Hero",
-      "Hero.tsx"
-    );
+    const componentPath = path.join(workspace.dir, "components", "section", "Hero", "Hero.tsx");
     expect(await exists(componentPath)).toBe(true);
   });
 
@@ -87,37 +66,16 @@ describe("add:component command E2E tests", () => {
     );
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "feature",
-      "Auth",
-      "Auth.tsx"
-    );
+    const componentPath = path.join(workspace.dir, "components", "feature", "Auth", "Auth.tsx");
     expect(await exists(componentPath)).toBe(true);
     const content = await readText(componentPath);
     expect(content).toMatch(/^"use client"/m);
 
-    const testPath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "feature",
-      "Auth",
-      "Auth.test.tsx"
-    );
+    const testPath = path.join(workspace.dir, "components", "feature", "Auth", "Auth.test.tsx");
     expect(await exists(testPath)).toBe(true);
 
     // For basic (no Tailwind/Chakra), should create CSS module
-    const stylePath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "feature",
-      "Auth",
-      "Auth.module.css"
-    );
+    const stylePath = path.join(workspace.dir, "components", "feature", "Auth", "Auth.module.css");
     expect(await exists(stylePath)).toBe(true);
   });
 
@@ -132,20 +90,13 @@ describe("add:component command E2E tests", () => {
     );
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(workspace.dir, "app", "components", "ui", "Badge", "Badge.tsx");
+    const componentPath = path.join(workspace.dir, "components", "ui", "Badge", "Badge.tsx");
     expect(await exists(componentPath)).toBe(true);
     const content = await readText(componentPath);
     expect(content).toContain("className");
 
     // Tailwind should not create CSS module
-    const cssModulePath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "ui",
-      "Badge",
-      "Badge.module.css"
-    );
+    const cssModulePath = path.join(workspace.dir, "components", "ui", "Badge", "Badge.module.css");
     expect(await exists(cssModulePath)).toBe(false);
   });
 
@@ -160,7 +111,7 @@ describe("add:component command E2E tests", () => {
     );
 
     expect(result.code).toBe(0);
-    const stylePath = path.join(workspace.dir, "app", "components", "ui", "Card", "Card.styles.ts");
+    const stylePath = path.join(workspace.dir, "components", "ui", "Card", "Card.styles.ts");
     expect(await exists(stylePath)).toBe(true);
     const content = await readText(stylePath);
     expect(content).toContain("SystemStyleObject");
@@ -170,14 +121,7 @@ describe("add:component command E2E tests", () => {
     const result = await runCli(workspace.dir, "add:component", "Hybrid", "--framework", "both");
 
     expect(result.code).toBe(0);
-    const componentPath = path.join(
-      workspace.dir,
-      "app",
-      "components",
-      "ui",
-      "Hybrid",
-      "Hybrid.tsx"
-    );
+    const componentPath = path.join(workspace.dir, "components", "ui", "Hybrid", "Hybrid.tsx");
     expect(await exists(componentPath)).toBe(true);
     const content = await readText(componentPath);
     expect(content).toContain("@chakra-ui/react");
@@ -210,7 +154,7 @@ describe("add:component command E2E tests", () => {
 
   it("barrel idempotency: re-running doesn't duplicate exports", async () => {
     await runCli(workspace.dir, "add:component", "Button", "--group", "ui");
-    const indexPath = path.join(workspace.dir, "app", "components", "ui", "index.ts");
+    const indexPath = path.join(workspace.dir, "components", "ui", "index.ts");
     const firstRun = await readText(indexPath);
     const exportLines1 = firstRun.split("\n").filter((l) => l.includes("export"));
 
@@ -221,5 +165,64 @@ describe("add:component command E2E tests", () => {
 
     // Should have same number of exports
     expect(exportLines1.length).toBe(exportLines2.length);
+  });
+
+  // Tests for --type flag (alias for --group)
+  it("--type ui: add:component Badge --type ui creates component in ui folder", async () => {
+    const result = await runCli(workspace.dir, "add:component", "Badge", "--type", "ui");
+
+    expect(result.code).toBe(0);
+    const componentPath = path.join(workspace.dir, "components", "ui", "Badge", "Badge.tsx");
+    expect(await exists(componentPath)).toBe(true);
+  });
+
+  it("--type layout: add:component Header --type layout creates component in layout folder", async () => {
+    const result = await runCli(workspace.dir, "add:component", "Header", "--type", "layout");
+
+    expect(result.code).toBe(0);
+    const componentPath = path.join(workspace.dir, "components", "layout", "Header", "Header.tsx");
+    expect(await exists(componentPath)).toBe(true);
+  });
+
+  it("--type section: add:component Hero --type section creates component in section folder", async () => {
+    const result = await runCli(workspace.dir, "add:component", "Hero", "--type", "section");
+
+    expect(result.code).toBe(0);
+    const componentPath = path.join(workspace.dir, "components", "section", "Hero", "Hero.tsx");
+    expect(await exists(componentPath)).toBe(true);
+  });
+
+  it("--type feature: add:component Dashboard --type feature creates component in feature folder", async () => {
+    const result = await runCli(workspace.dir, "add:component", "Dashboard", "--type", "feature");
+
+    expect(result.code).toBe(0);
+    const componentPath = path.join(
+      workspace.dir,
+      "components",
+      "feature",
+      "Dashboard",
+      "Dashboard.tsx"
+    );
+    expect(await exists(componentPath)).toBe(true);
+  });
+
+  it("--type takes precedence over --group", async () => {
+    const result = await runCli(
+      workspace.dir,
+      "add:component",
+      "TestComp",
+      "--type",
+      "layout",
+      "--group",
+      "ui"
+    );
+
+    expect(result.code).toBe(0);
+    // Should be in layout, not ui
+    const layoutPath = path.join(workspace.dir, "components", "layout", "TestComp", "TestComp.tsx");
+    expect(await exists(layoutPath)).toBe(true);
+
+    const uiPath = path.join(workspace.dir, "components", "ui", "TestComp", "TestComp.tsx");
+    expect(await exists(uiPath)).toBe(false);
   });
 });
