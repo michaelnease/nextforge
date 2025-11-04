@@ -120,9 +120,7 @@ describe("add:cursor", () => {
 
   it("missing required flag errors", async () => {
     // Missing --name for rules
-    await expect(runCLI(["add:cursor", "rules"])).rejects.toThrow(
-      "--name is required for type 'rules'"
-    );
+    await expect(runCLI(["add:cursor", "rules"])).rejects.toThrow("Missing --name for rules");
 
     // Missing --phase for phase
     await expect(runCLI(["add:cursor", "phase"])).rejects.toThrow(
@@ -187,8 +185,8 @@ describe("add:cursor", () => {
     }
   });
 
-  it("normalizes names to kebab-case", async () => {
-    await runCLI(["add:cursor", "rules", "--name", "My Component Test"]);
+  it("normalizes spaces and special chars to kebab-case", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "my  component  test"]);
 
     const filePath = join(ws.dir, ".nextforge/cursor/rules/my-component-test.rules.json");
     await expect(exists(filePath)).resolves.toBe(true);
@@ -199,17 +197,29 @@ describe("add:cursor", () => {
 
   it("rejects empty names", async () => {
     await expect(runCLI(["add:cursor", "rules", "--name", ""])).rejects.toThrow(
-      "Invalid --name. Use letters/numbers. Example: audit-trace"
+      "Missing --name for rules"
     );
 
     await expect(runCLI(["add:cursor", "rules", "--name", "   "])).rejects.toThrow(
-      "Invalid --name. Use letters/numbers. Example: audit-trace"
+      "Missing --name for rules"
     );
   });
 
   it("rejects invalid names with only special characters", async () => {
     await expect(runCLI(["add:cursor", "rules", "--name", "!!!"])).rejects.toThrow(
-      "Invalid --name. Use letters/numbers. Example: audit-trace"
+      'Invalid --name. Use kebab-case, e.g. "cursor-rules"'
+    );
+  });
+
+  it("rejects names with uppercase letters", async () => {
+    await expect(runCLI(["add:cursor", "rules", "--name", "MyComponent"])).rejects.toThrow(
+      'Invalid --name. Use kebab-case, e.g. "cursor-rules"'
+    );
+  });
+
+  it("rejects names with underscores", async () => {
+    await expect(runCLI(["add:cursor", "rules", "--name", "my_component"])).rejects.toThrow(
+      'Invalid --name. Use kebab-case, e.g. "cursor-rules"'
     );
   });
 
@@ -308,5 +318,109 @@ describe("add:cursor", () => {
 
     expect(jsonEntry.format).toBe("json");
     expect(mdxEntry.format).toBe("mdx");
+  });
+
+  it("adds createdAt timestamp to index entries", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "timestamp-test"]);
+
+    const indexPath = join(ws.dir, ".nextforge/cursor/index.json");
+    const index = JSON.parse(await readText(indexPath));
+
+    const entry = index.find((item: { name: string }) => item.name === "timestamp-test");
+    expect(entry.createdAt).toBeDefined();
+    expect(new Date(entry.createdAt).getTime()).toBeGreaterThan(0);
+  });
+
+  it("preserves createdAt on --force updates", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "preserve-time"]);
+
+    const indexPath = join(ws.dir, ".nextforge/cursor/index.json");
+    const firstIndex = JSON.parse(await readText(indexPath));
+    const firstEntry = firstIndex.find((item: { name: string }) => item.name === "preserve-time");
+    const originalCreatedAt = firstEntry.createdAt;
+
+    // Wait a bit to ensure timestamp would differ
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await runCLI(["add:cursor", "rules", "--name", "preserve-time", "--force"]);
+
+    const secondIndex = JSON.parse(await readText(indexPath));
+    const secondEntry = secondIndex.find((item: { name: string }) => item.name === "preserve-time");
+
+    expect(secondEntry.createdAt).toBe(originalCreatedAt);
+  });
+
+  it("sorts index entries by name", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "zebra"]);
+    await runCLI(["add:cursor", "rules", "--name", "alpha"]);
+    await runCLI(["add:cursor", "rules", "--name", "middle"]);
+
+    const indexPath = join(ws.dir, ".nextforge/cursor/index.json");
+    const index = JSON.parse(await readText(indexPath));
+
+    const names = index.map((item: { name: string }) => item.name);
+    const sortedNames = [...names].sort();
+
+    expect(names).toEqual(sortedNames);
+  });
+
+  it("handles corrupt index.json gracefully", async () => {
+    const indexPath = join(ws.dir, ".nextforge/cursor/index.json");
+
+    // Create corrupt JSON
+    await writeFile(indexPath, "{ invalid json }");
+
+    // Should still succeed and create valid index
+    await runCLI(["add:cursor", "rules", "--name", "recovery-test"]);
+
+    const index = JSON.parse(await readText(indexPath));
+    expect(Array.isArray(index)).toBe(true);
+    expect(index.length).toBe(1);
+    expect(index[0].name).toBe("recovery-test");
+  });
+
+  it("MDX templates include frontmatter and Do/Don't sections", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "test-mdx-content", "--mdx"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/test-mdx-content.rules.mdx");
+    const content = await readText(filePath);
+
+    // Check frontmatter
+    expect(content).toContain("---");
+    expect(content).toContain("title: test-mdx-content");
+    expect(content).toContain("tags: [cursor, rules]");
+
+    // Check Do/Don't sections
+    expect(content).toContain("## Do");
+    expect(content).toContain("## Don't");
+    expect(content).toContain("✅");
+    expect(content).toContain("❌");
+
+    // Check File Ownership section
+    expect(content).toContain("## File Ownership");
+  });
+
+  it("JSON templates include dos and donts fields", async () => {
+    await runCLI(["add:cursor", "rules", "--name", "test-json-content"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/rules/test-json-content.rules.json");
+    const content = JSON.parse(await readText(filePath));
+
+    expect(content.dos).toBeDefined();
+    expect(Array.isArray(content.dos)).toBe(true);
+    expect(content.donts).toBeDefined();
+    expect(Array.isArray(content.donts)).toBe(true);
+  });
+
+  it("phase templates include checklist and deliverables", async () => {
+    await runCLI(["add:cursor", "phase", "--phase", "10", "--mdx"]);
+
+    const filePath = join(ws.dir, ".nextforge/cursor/phases/phase-10.mdx");
+    const content = await readText(filePath);
+
+    expect(content).toContain("## Checklist");
+    expect(content).toContain("## Inputs");
+    expect(content).toContain("## Deliverables");
+    expect(content).toContain("{{selection}}");
   });
 });
