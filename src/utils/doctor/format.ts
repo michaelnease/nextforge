@@ -54,6 +54,7 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
       JSON.stringify(
         {
           schema: "nextforge.doctor@1",
+          timestamp: new Date().toISOString(),
           ok: failed === 0,
           exitCode,
           summary: {
