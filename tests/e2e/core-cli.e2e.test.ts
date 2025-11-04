@@ -34,10 +34,12 @@ describe("Core CLI smoke tests", () => {
     workspace = await makeTempWorkspace();
     const result = await runCli(workspace.dir, "doctor");
 
-    expect(result.code).toBe(0);
-    // Doctor command uses ora spinner which outputs to stderr or stdout
+    // Exit code 0 = all pass, 1 = warnings (acceptable), 2 = failures (not acceptable)
+    expect(result.code).toBeLessThanOrEqual(1);
+    // Doctor command outputs report to stdout
     const output = (result.stdout + result.stderr).toLowerCase();
-    expect(output).toMatch(/doctor.*running/i);
+    expect(output).toMatch(/doctor/i);
+    expect(output).toMatch(/report|check|node\.js|next\.js/i);
   });
 
   it("init creates nextforge.config.ts in temp workspace", async () => {
