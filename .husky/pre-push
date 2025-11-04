@@ -1,1 +1,2 @@
+# Full verification before push (includes tests and build)
 npm run verify
