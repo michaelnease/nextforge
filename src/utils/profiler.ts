@@ -51,6 +51,9 @@ export interface ProfileSummary {
   };
   gc: GCEvent[];
   steps?: StepTiming[];
+  version?: string;
+  nodeVersion?: string;
+  platform?: string;
 }
 
 /**
@@ -75,10 +78,24 @@ export class Profiler {
   private eventLoopMonitor?: ReturnType<typeof monitorEventLoopDelay>;
   private gcObserver?: PerformanceObserver;
   private profilingEnabled: boolean;
+  private version?: string | undefined;
+  private nodeVersion?: string | undefined;
+  private platform?: string | undefined;
 
-  constructor(commandName: string, enableProfiling = false) {
+  constructor(
+    commandName: string,
+    enableProfiling = false,
+    metadata?: {
+      version?: string | undefined;
+      nodeVersion?: string | undefined;
+      platform?: string | undefined;
+    }
+  ) {
     this.commandName = commandName;
     this.profilingEnabled = enableProfiling;
+    this.version = metadata?.version ?? undefined;
+    this.nodeVersion = metadata?.nodeVersion ?? undefined;
+    this.platform = metadata?.platform ?? undefined;
     this.startTime = performance.now();
     this.startMem = this.captureMemory();
     this.peakMem = { ...this.startMem };
@@ -308,6 +325,17 @@ export class Profiler {
       });
     }
 
+    // Include metadata if provided
+    if (this.version) {
+      summary.version = this.version;
+    }
+    if (this.nodeVersion) {
+      summary.nodeVersion = this.nodeVersion;
+    }
+    if (this.platform) {
+      summary.platform = this.platform;
+    }
+
     return summary;
   }
 }
@@ -333,7 +361,7 @@ export function formatProfileSummary(profile: ProfileSummary): string {
 
   const bytesToKB = (bytes: number) => (bytes / 1024).toFixed(1);
   lines.push(
-    `io reads=${profile.io.reads} writes=${profile.io.writes} bytesRead=${bytesToKB(profile.io.bytesRead)} KB bytesWritten=${bytesToKB(profile.io.bytesWritten)} B`
+    `io reads=${profile.io.reads} writes=${profile.io.writes} bytesRead=${bytesToKB(profile.io.bytesRead)} KB bytesWritten=${bytesToKB(profile.io.bytesWritten)} KB`
   );
 
   if (profile.gc.length > 0) {
