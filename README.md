@@ -365,25 +365,29 @@ nextforge doctor --metrics json | jq
 }
 ```
 
-**Examples:**
+**Quick Examples:**
 
 ```bash
-# Profile a slow command
-nextforge add:component ComplexForm --profile
+# Get performance summary
+npx nextforge doctor --profile
 
-# Compare performance across commands
-for cmd in doctor init add:page; do
-  nextforge $cmd --metrics json 2>/dev/null | jq -r '"\(.cmd): \(.wallMs)ms"'
+# Save metrics to file
+npx nextforge add:page about --metrics json > .nextforge/last.json
+
+# View I/O stats
+npx nextforge add:page reports --metrics json | jq '.io'
+
+# Check step timings
+npx nextforge add:page dashboard --metrics json | jq '.steps'
+
+# Compare commands
+for cmd in doctor "add:page test" "add:component Button"; do
+  echo -n "$cmd: "
+  npx nextforge $cmd --metrics json 2>/dev/null | jq -r '.wallMs + "ms"'
 done
 
-# Monitor memory usage
-nextforge doctor --metrics json | jq '.memory'
-
-# Track GC overhead
-nextforge add:page reports --profile 2>&1 | grep "gc"
-
-# Benchmark with env var
-NEXTFORGE_PROFILE=1 nextforge doctor
+# Monitor memory across runs
+npx nextforge add:page users --metrics json | jq '.memory | {peak: .peakMB, delta: (.endMB - .startMB)}'
 ```
 
 **Profiling Overhead:**

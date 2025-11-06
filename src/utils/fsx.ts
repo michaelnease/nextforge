@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import type { Profiler } from "./profiler.js";
+
 /**
  * Ensure directory exists, creating it recursively if needed.
  */
@@ -23,29 +25,40 @@ export async function exists(p: string): Promise<boolean> {
 /**
  * Read text file content.
  */
-export async function readText(p: string): Promise<string> {
-  return await fs.readFile(p, "utf8");
+export async function readText(p: string, profiler?: Profiler): Promise<string> {
+  const content = await fs.readFile(p, "utf8");
+  if (profiler) {
+    profiler.bumpRead(Buffer.byteLength(content, "utf8"));
+  }
+  return content;
 }
 
 /**
  * Write text file content.
  */
-export async function writeText(p: string, s: string): Promise<void> {
+export async function writeText(p: string, s: string, profiler?: Profiler): Promise<void> {
   await fs.writeFile(p, s, "utf8");
+  if (profiler) {
+    profiler.bumpWrite(Buffer.byteLength(s, "utf8"));
+  }
 }
 
 /**
  * Write file only if it doesn't exist.
  * Returns true if file was created, false if it already existed.
  */
-export async function writeIfAbsent(file: string, contents: string): Promise<boolean> {
+export async function writeIfAbsent(
+  file: string,
+  contents: string,
+  profiler?: Profiler
+): Promise<boolean> {
   try {
     await fs.access(file);
     return false; // file exists
   } catch {
     // file doesn't exist, create it
     await ensureDir(path.dirname(file));
-    await writeText(file, contents);
+    await writeText(file, contents, profiler);
     return true;
   }
 }
@@ -58,8 +71,9 @@ export async function writeIfAbsent(file: string, contents: string): Promise<boo
 export async function safeWrite(
   file: string,
   contents: string,
-  { force }: { force?: boolean } = {}
+  options: { force?: boolean; profiler?: Profiler } = {}
 ): Promise<void> {
+  const { force, profiler } = options;
   if (!force) {
     const fileExists = await exists(file);
     if (fileExists) {
@@ -67,5 +81,5 @@ export async function safeWrite(
     }
   }
   await ensureDir(path.dirname(file));
-  await writeText(file, contents);
+  await writeText(file, contents, profiler);
 }

@@ -52,9 +52,13 @@ export function registerAddPage(program: Command) {
       ) => {
         await runCommand(
           "add:page",
-          async ({ logger }) => {
+          async ({ logger, profiler }) => {
             try {
               logger.debug({ route, opts }, "add:page called with options");
+
+              // Validation step
+              const validateStep = profiler.step("validate options and route");
+
               // Check mutually exclusive flags
               if (opts.async && opts.client) {
                 console.error("Choose exactly one of --async or --client");
@@ -96,15 +100,20 @@ export function registerAddPage(program: Command) {
                 throw err;
               }
 
+              validateStep.end();
+
               // Load config and resolve app directory
+              const configStep = profiler.step("load config");
               const config = await loadConfig({ cwd: process.cwd() });
               const appDir = await resolveAppRoot({
                 ...(opts.app && { appFlag: opts.app }),
                 ...(config.pagesDir && { configPagesDir: config.pagesDir }),
                 createIfMissing: false, // pages must error if the app dir is missing
               });
+              configStep.end();
 
               // Generate page path with optional route group
+              const generateStep = profiler.step("generate files");
               let routeSegments = route.split("/").filter(Boolean);
               if (opts.group) {
                 // Wrap in route group: (groupName)
@@ -119,21 +128,33 @@ export function registerAddPage(program: Command) {
                 const pagePath = path.join(pageDir, "page.tsx");
                 const lastSegment = routeSegments[routeSegments.length - 1];
                 const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
-                await safeWrite(pagePath, template, opts.force ? { force: true } : {});
+                await safeWrite(
+                  pagePath,
+                  template,
+                  opts.force ? { force: true, profiler } : { profiler }
+                );
               }
 
               // Write layout file if --layout is set
               if (opts.layout) {
                 const layoutPath = path.join(pageDir, "layout.tsx");
                 const layoutTemplate = generateLayoutTemplate(!!opts.client);
-                await safeWrite(layoutPath, layoutTemplate, opts.force ? { force: true } : {});
+                await safeWrite(
+                  layoutPath,
+                  layoutTemplate,
+                  opts.force ? { force: true, profiler } : { profiler }
+                );
               }
 
               // Write API route file if --api is set
               if (opts.api) {
                 const apiPath = path.join(pageDir, "route.ts");
                 const apiTemplate = generateApiRouteTemplate();
-                await safeWrite(apiPath, apiTemplate, opts.force ? { force: true } : {});
+                await safeWrite(
+                  apiPath,
+                  apiTemplate,
+                  opts.force ? { force: true, profiler } : { profiler }
+                );
               }
 
               // Write test file if --with-tests is set
@@ -142,12 +163,20 @@ export function registerAddPage(program: Command) {
                 await ensureDir(testDir);
                 const testPath = path.join(testDir, "page.test.tsx");
                 const testTemplate = generatePageTestTemplate(route);
-                await safeWrite(testPath, testTemplate, opts.force ? { force: true } : {});
+                await safeWrite(
+                  testPath,
+                  testTemplate,
+                  opts.force ? { force: true, profiler } : { profiler }
+                );
               }
 
+              generateStep.end();
+
               // Update page manifest
+              const manifestStep = profiler.step("update manifest");
               const manifestRoute = routeSegments.join("/");
               await updatePageManifest(appDir, manifestRoute);
+              manifestStep.end();
 
               logger.info({ route: manifestRoute }, "Page created successfully");
             } catch (err) {

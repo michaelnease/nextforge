@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import os from "node:os";
 
 import type { Logger } from "pino";
 
@@ -39,8 +40,12 @@ export async function runCommand<T = void>(
   // Check for metrics JSON env var
   const metricsJson = options.metricsJson || process.env.NEXTFORGE_METRICS === "json";
 
-  // Create profiler
-  const profiler = new Profiler(commandName, enableProfiling);
+  // Create profiler with metadata
+  const profiler = new Profiler(commandName, enableProfiling, {
+    version: process.env.npm_package_version,
+    nodeVersion: process.version,
+    platform: `${os.platform()}-${os.arch()}`,
+  });
 
   // Create contextual logger
   const logger = createLogger({
