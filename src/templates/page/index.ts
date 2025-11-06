@@ -6,16 +6,23 @@ export function generatePageTemplate(
   async: boolean,
   routeSegment?: string
 ): string {
-  // For dynamic routes, extract param name from [slug] or [[...slug]]
-  let content = "<div>page</div>";
+  // Determine testid and content
+  let testId = "page";
+  let displayText = "page";
+
   if (routeSegment) {
+    testId = routeSegment;
     const match = routeSegment.match(/\[+([^\]]+)\]+/);
     if (match && match[1]) {
       const paramName = match[1].replace("...", "");
       const capitalize = paramName.charAt(0).toUpperCase() + paramName.slice(1);
-      content = `<div>${capitalize}</div>`;
+      displayText = capitalize;
+    } else {
+      displayText = routeSegment;
     }
   }
+
+  const content = `<div data-testid="${testId}">${displayText}</div>`;
 
   if (client) {
     return `"use client";
@@ -68,13 +75,17 @@ export async function GET() {
  * Generate page test template.
  */
 export function generatePageTestTemplate(route: string): string {
+  // Extract the last segment for the testid
+  const segments = route.split("/").filter(Boolean);
+  const lastSegment = segments[segments.length - 1] || "page";
+
   return `import Page from "../page";
 import { render, screen } from "@testing-library/react";
 
 describe("page ${route}", () => {
   it("renders", () => {
     render(<Page />);
-    expect(screen.getByText(/page/i)).toBeTruthy();
+    expect(screen.getByTestId("${lastSegment}")).toBeTruthy();
   });
 });
 `;

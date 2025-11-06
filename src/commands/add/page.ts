@@ -51,6 +51,16 @@ export function registerAddPage(program: Command) {
             return;
           }
 
+          // Check --skip-page without --api
+          if (opts.skipPage && !opts.api) {
+            console.error("Cannot use --skip-page without --api");
+            console.error(
+              "Hint: use --api to create an API route, or omit --skip-page to create a page"
+            );
+            process.exitCode = 1;
+            return;
+          }
+
           // Validate route
           try {
             validatePageRoute(route);

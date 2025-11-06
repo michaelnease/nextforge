@@ -75,16 +75,6 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
     console.log(
       JSON.stringify(
         {
-          schema: "nextforge.doctor@1",
-          timestamp: new Date().toISOString(),
-          ok: failed === 0,
-          exitCode,
-          summary: {
-            passed,
-            warnings: warned,
-            failed,
-            total: results.length,
-          },
           results: results.map((r) => ({
             id: r.id,
             title: r.title,
@@ -93,6 +83,12 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
             details: r.details,
             fix: r.fix,
           })),
+          summary: {
+            pass: passed,
+            warn: warned,
+            fail: failed,
+          },
+          exitCode,
         },
         null,
         2
