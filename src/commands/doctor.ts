@@ -2,6 +2,17 @@ import { Command } from "commander";
 
 import { runDoctor } from "../utils/doctor/runDoctor.js";
 
+/**
+ * Doctor command - runs health checks for NextForge setup
+ *
+ * Exit codes:
+ *   0 - All checks passed
+ *   1 - Warnings found (non-critical issues)
+ *   2 - Failures found (critical issues)
+ *   3 - Doctor crashed unexpectedly
+ *
+ * This convention allows CI to fail on failures (exit 2) but pass on warnings (exit 1).
+ */
 export const doctorCommand = new Command("doctor")
   .description("Run health checks for your NextForge setup")
   .option("--app <path>", "Path to Next.js app directory")

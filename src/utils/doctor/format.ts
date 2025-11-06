@@ -13,6 +13,23 @@ function shouldDisableColors(): boolean {
   );
 }
 
+/**
+ * Detect if a fix suggestion is a shell command that can be copy-pasted
+ */
+function isShellCommand(suggestion: string): boolean {
+  // Check for common command patterns
+  return (
+    suggestion.startsWith("npm ") ||
+    suggestion.startsWith("npx ") ||
+    suggestion.startsWith("echo ") ||
+    suggestion.startsWith("setopt ") ||
+    suggestion.startsWith("mkdir ") ||
+    suggestion.includes(" >> ") ||
+    suggestion.includes("nvm install") ||
+    suggestion.includes("node --version")
+  );
+}
+
 export function formatResults(results: DoctorResult[], flags: DoctorFlags): number {
   const disableColors = flags.ci || flags.json || shouldDisableColors();
   const lines: string[] = [];
@@ -20,6 +37,7 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
   let passed = 0;
   let failed = 0;
   let warned = 0;
+  const shellCommands: string[] = [];
 
   for (const r of results) {
     const color =
@@ -39,6 +57,10 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
       lines.push(`  Fix suggestions:`);
       for (const suggestion of r.fix) {
         lines.push(`    - ${suggestion}`);
+        // Collect shell commands for the shell fixes section
+        if (isShellCommand(suggestion)) {
+          shellCommands.push(suggestion);
+        }
       }
     }
 
@@ -81,13 +103,33 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
     console.log(lines.join("\n"));
     console.log();
 
-    // Summary footer
+    // Shell fixes section (if any commands to copy-paste)
+    if (shellCommands.length > 0 && !flags.ci) {
+      const fixHeader = disableColors
+        ? "\nShell Fixes (copy-paste):"
+        : kleur.cyan("\nShell Fixes (copy-paste):");
+      console.log(fixHeader);
+      for (const cmd of shellCommands) {
+        console.log(`  ${cmd}`);
+      }
+      console.log();
+    }
+
+    // Summary footer with exit code convention
     const summaryParts = [];
     if (passed > 0) summaryParts.push(`${passed} passed`);
     if (warned > 0) summaryParts.push(`${warned} warnings`);
     if (failed > 0) summaryParts.push(`${failed} failed`);
 
-    console.log(`Summary: ${summaryParts.join(", ")} • Exit ${exitCode}\n`);
+    const exitCodeInfo = disableColors
+      ? `Exit ${exitCode}`
+      : exitCode === 0
+        ? kleur.green(`Exit ${exitCode}`)
+        : exitCode === 1
+          ? kleur.yellow(`Exit ${exitCode}`)
+          : kleur.red(`Exit ${exitCode}`);
+
+    console.log(`Summary: ${summaryParts.join(", ")} • ${exitCodeInfo}\n`);
   }
 
   if (failed > 0) return 2;

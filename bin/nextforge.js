@@ -5,10 +5,22 @@ import { dirname, join } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const mod = await import(join(__dirname, "../dist/index.js"));
+let mod;
+try {
+  mod = await import(join(__dirname, "../dist/index.js"));
+} catch (err) {
+  console.error("nextforge: Failed to load CLI module.");
+  console.error(err?.stack || String(err));
+  console.error("\nIf this issue persists, please report it at:");
+  console.error("https://github.com/anthropics/claude-code/issues");
+  process.exit(1);
+}
+
 const main = typeof mod.main === "function" ? mod.main : null;
 if (!main) {
   console.error("nextforge: dist/index.js did not export main()");
+  console.error("\nIf this issue persists, please report it at:");
+  console.error("https://github.com/anthropics/claude-code/issues");
   process.exit(1);
 }
 

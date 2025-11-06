@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Command } from "commander";
 
 import { loadConfig } from "../../config/loadConfig.js";
+import { layoutTemplate, readmeTemplate } from "../../templates/index.js";
 import { ensureDir } from "../../utils/fsx.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
 import { validateGroupName } from "../../utils/validate.js";
@@ -41,26 +42,6 @@ function pageCode(name: string): string {
   return `export default function Page() {
   return <div data-testid="${name}">${name}</div>;
 }
-`;
-}
-
-function layoutTemplate() {
-  return `import React, { type ReactNode } from "react";
-
-export default function GroupLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>;
-}
-`;
-}
-
-function readmeTemplate(groupLabel: string) {
-  return `# ${groupLabel} route group
-
-This is a Next.js **route group**. The folder name is wrapped in parentheses so it does **not** affect the URL path.
-Use this folder to organize segments like auth flows, marketing sections, experiments, or feature areas.
-
-- Add child segments under this folder, e.g. \`(auth)/signin/page.tsx\`
-- Optional \`layout.tsx\` here will wrap all child routes under the group.
 `;
 }
 
@@ -106,7 +87,7 @@ export function registerAddGroup(program: Command) {
         }
 
         // Resolve app directory with path normalization
-        const config = await loadConfig(process.cwd());
+        const config = await loadConfig({ cwd: process.cwd() });
         const appDir = await resolveAppRoot({
           ...(opts.app && { appFlag: opts.app }),
           ...(config.pagesDir && { configPagesDir: config.pagesDir }),

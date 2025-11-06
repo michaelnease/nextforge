@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import { cjsTemplate, mjsTemplate, tsTemplate } from "./templates.js";
+import { cjsTemplate, mjsTemplate, tsTemplate } from "../../templates/init/templates.js";
 
 export interface InitFlags {
   force: boolean;

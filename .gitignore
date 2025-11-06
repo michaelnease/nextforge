@@ -20,3 +20,7 @@ coverage/
 .vitest/
 scripts/temp/
 tmp/
+.husky/_/
+
+# NextForge generated files
+.nextforge/

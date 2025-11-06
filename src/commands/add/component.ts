@@ -8,40 +8,12 @@ import {
   makeComponentSource,
   makeTestSource,
 } from "../../generators/components.js";
+import { cssModuleTemplate, storyTemplate } from "../../templates/index.js";
 import { flagsFrom, resolveFramework } from "../../utils/framework.js";
 import { ensureDir } from "../../utils/fsx.js";
 import { updateComponentManifest } from "../../utils/manifest.js";
 import { type Group } from "../../utils/paths.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
-
-/**
- * Generate CSS module template
- */
-function cssModuleTemplate(): string {
-  return `.container {
-  /* Add your styles here */
-}
-`;
-}
-
-/**
- * Generate Storybook story template
- */
-function storyTemplate(name: string, group: string): string {
-  return `import type { Meta, StoryObj } from "@storybook/react";
-import ${name} from "./${name}";
-
-const meta = {
-  title: "components/${group}/${name}",
-  component: ${name},
-} satisfies Meta<typeof ${name}>;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
-
-export const Primary: Story = {};
-`;
-}
 
 export function registerAddComponent(program: Command) {
   program
@@ -75,10 +47,24 @@ export function registerAddComponent(program: Command) {
           client?: boolean;
         }
       ) => {
-        // Load config first
-        const config = await loadConfig(process.cwd()).catch(
-          () => ({}) as { useTailwind?: boolean; useChakra?: boolean; pagesDir?: string }
-        );
+        // Load config first - let errors propagate for invalid schemas
+        let config;
+        try {
+          config = await loadConfig({ cwd: process.cwd() });
+        } catch (err) {
+          // Re-throw config validation errors
+          if (err instanceof Error && err.message.includes("Invalid nextforge config")) {
+            console.error(err.message);
+            process.exitCode = 1;
+            throw err;
+          }
+          // For other errors (missing config), use defaults
+          config = {
+            useTailwind: true,
+            useChakra: false,
+            pagesDir: "app",
+          };
+        }
 
         // Resolve app root with precedence: --app > config.pagesDir > "app"
         // Throws "App directory not found" if missing
@@ -144,7 +130,7 @@ export function registerAddComponent(program: Command) {
         // Framework resolution with validation
         const framework = resolveFramework(
           opts.framework ? { framework: opts.framework } : {},
-          config
+          config ? { useTailwind: config.useTailwind, useChakra: config.useChakra } : undefined
         );
         const fw = flagsFrom(framework);
 

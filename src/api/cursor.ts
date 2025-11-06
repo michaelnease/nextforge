@@ -1,15 +1,46 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { phaseTemplate } from "../templates/cursor/phaseTemplate.js";
-import { rulesTemplate } from "../templates/cursor/rulesTemplate.js";
-import { loadConfig } from "../utils/loadConfig.js";
+import { loadConfig } from "../config/loadConfig.js";
+import { phaseTemplate, rulesTemplate } from "../templates/index.js";
 
 /**
  * Validate that a name is in valid kebab-case format.
  */
-function isKebabCase(name: string): boolean {
+export function isKebabCase(name: string): boolean {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name);
+}
+
+/**
+ * Normalize a name to kebab-case for use in filenames.
+ * Removes quotes, converts to lowercase, replaces non-alphanumeric with dashes.
+ * @throws Error if name contains uppercase or underscores (must be valid kebab-case input)
+ */
+export function normalizeName(raw: string): string {
+  // Reject uppercase letters - must be lowercase
+  if (raw !== raw.toLowerCase()) {
+    throw new Error('Invalid --name. Use kebab-case (e.g. "component-rules")');
+  }
+
+  // Reject underscores - must use hyphens
+  if (raw.includes("_")) {
+    throw new Error('Invalid --name. Use kebab-case (e.g. "component-rules")');
+  }
+
+  // Now normalize spaces and special chars
+  const slug = raw
+    .trim()
+    .replace(/['"`]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()
+    .replace(/-+/g, "-");
+
+  if (!slug || !isKebabCase(slug)) {
+    throw new Error('Invalid --name. Use kebab-case (e.g. "component-rules")');
+  }
+
+  return slug;
 }
 
 type CursorIndexEntry = {
@@ -123,10 +154,12 @@ export type CreateCursorRulesOptions = {
 export async function createCursorRules(opts: CreateCursorRulesOptions): Promise<string> {
   const { name, format = "json", cwd = process.cwd(), force = false, cursorDir } = opts;
 
-  // Validate name is kebab-case
+  // Validate that name is already in kebab-case format
   if (!isKebabCase(name)) {
     throw new Error('Invalid --name. Use kebab-case (e.g. "component-rules")');
   }
+
+  const normalizedName = name;
 
   // Load config and determine output directory
   const config = await loadConfig({ cwd });
@@ -138,9 +171,9 @@ export async function createCursorRules(opts: CreateCursorRulesOptions): Promise
 
   const ext = format === "mdx" ? ".mdx" : ".json";
   const folder = "rules";
-  const fileName = `${name}.rules${ext}`;
+  const fileName = `${normalizedName}.rules${ext}`;
   const filePath = path.join(baseDir, folder, fileName);
-  const content = rulesTemplate({ name, format });
+  const content = rulesTemplate({ name: normalizedName, format });
 
   const wasWritten = await writeIfAbsent(filePath, content, force);
 
@@ -149,7 +182,7 @@ export async function createCursorRules(opts: CreateCursorRulesOptions): Promise
     const indexFile = path.posix.join(baseCursorDir, folder, fileName);
     await updateIndex(baseDir, {
       type: folder,
-      name,
+      name: normalizedName,
       file: indexFile,
       format,
     });

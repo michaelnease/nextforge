@@ -177,8 +177,62 @@ export default {
   useChakra: false,
   defaultLayout: "main",
   pagesDir: "app",
+  cursorDir: ".nextforge/cursor",
+  dockerCompose: true,
 };
 ```
+
+#### Config Precedence
+
+Configuration values are resolved in the following order (highest to lowest priority):
+
+1. **CLI flags** - Explicit command-line arguments (e.g., `--framework tailwind`)
+2. **Environment variables** - `NEXTFORGE_*` environment variables
+3. **Config file** - `nextforge.config.{ts,js,json}` in project root
+4. **Defaults** - Built-in sensible defaults
+
+**Environment variables:**
+
+- `NEXTFORGE_USE_TAILWIND` (`true|false`)
+- `NEXTFORGE_USE_CHAKRA` (`true|false`)
+- `NEXTFORGE_DEFAULT_LAYOUT` (string)
+- `NEXTFORGE_PAGES_DIR` (string)
+
+**Examples:**
+
+```bash
+# Override config with CLI flag
+nextforge add:component Button --framework chakra
+
+# Override config with environment variable
+NEXTFORGE_USE_TAILWIND=false nextforge add:component Card
+
+# Use config default (no flag or env var)
+nextforge add:component Badge
+```
+
+#### Shell Compatibility
+
+**zsh users:** Quote arguments containing brackets to prevent shell globbing:
+
+```bash
+# ✅ Correct (quoted)
+nextforge add:page "blog/[slug]"
+nextforge add:page "docs/[...parts]"
+nextforge add:group auth --pages "signin,signup,[id]"
+
+# ❌ Incorrect (unquoted - zsh will expand brackets)
+nextforge add:page blog/[slug]
+nextforge add:page docs/[...parts]
+```
+
+If you frequently use dynamic routes, add this to your `~/.zshrc` to disable bracket expansion:
+
+```bash
+setopt no_nomatch
+```
+
+The `doctor` command will detect zsh and provide guidance if needed.
 
 ### Component Generation
 
@@ -396,28 +450,6 @@ Components are automatically exported from barrel files (`components/<group>/ind
 ```tsx
 import { Button, Card } from "@/components/ui";
 ```
-
-- `--client` - Add "use client" header
-- `--with-test` - Create a basic Vitest test file
-- `--with-story` - Create a Storybook story file
-- `--force` - Overwrite existing files
-
-Notes:
-
-- If no config file is found, sensible defaults are used.
-- Works in both ESM and CommonJS projects.
-- TS config requires running with a loader (e.g., `tsx`). Otherwise, use `.mjs`/`.js`/`.json`.
-
-Precedence:
-
-- CLI flags → Environment variables → Config file → Defaults
-
-Environment variables:
-
-- `NEXTFORGE_USE_TAILWIND` (`true|false`)
-- `NEXTFORGE_USE_CHAKRA` (`true|false`)
-- `NEXTFORGE_DEFAULT_LAYOUT` (string)
-- `NEXTFORGE_PAGES_DIR` (string)
 
 #### Page Generation Options
 
@@ -919,6 +951,63 @@ npm run zip:pr -- --since $(git describe --tags --abbrev=0)
 
 - Node.js >= 18.18.0
 - ESM-only modules
+
+## Uninstall
+
+To remove NextForge from your project:
+
+### 1. Remove the package
+
+```bash
+# If installed globally
+npm uninstall -g @forged/nextforge
+
+# If installed as dev dependency
+npm uninstall -D @forged/nextforge
+# or
+pnpm remove -D @forged/nextforge
+```
+
+### 2. Clean up generated files (optional)
+
+NextForge creates files in your project. To remove them:
+
+```bash
+# Remove generated NextForge files
+rm -rf .nextforge/
+
+# Remove config file (if you created one)
+rm nextforge.config.ts
+# or
+rm nextforge.config.js
+# or
+rm nextforge.config.json
+
+# Remove generated components (review before deleting!)
+# Components are in: app/components/{ui,layout,section,feature}/
+# Review and manually delete only NextForge-generated components
+
+# Remove generated pages (review before deleting!)
+# Pages are under your app directory
+# Review and manually delete only NextForge-generated pages
+```
+
+**Note:** NextForge does not track which specific files it created after generation, so manually review components and pages before deletion. The `.nextforge/manifest.json` file lists component names but not full paths.
+
+### 3. Revert git changes (optional)
+
+If you want to undo all NextForge changes:
+
+```bash
+# View NextForge-related commits
+git log --grep="NextForge" --grep="nextforge" -i --oneline
+
+# Revert specific commits
+git revert <commit-hash>
+
+# Or reset to before NextForge (⚠️ destructive!)
+git reset --hard <commit-before-nextforge>
+```
 
 ## License
 
