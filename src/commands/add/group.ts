@@ -56,7 +56,7 @@ export function registerAddGroup(program: Command) {
     .option("--force", "Overwrite existing files", false)
     .option(
       "--pages <list>",
-      "Comma-separated child leaf segments to seed, e.g. signin,signup,reset or [slug],[...rest]"
+      'Comma-separated child leaf segments to seed, e.g. signin,signup,reset or [slug],[...rest]. Note: quote bracket args in zsh: --pages "signin,[slug]"'
     )
     .action(async (name, opts) => {
       try {

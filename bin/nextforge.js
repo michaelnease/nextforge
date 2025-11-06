@@ -11,16 +11,18 @@ try {
 } catch (err) {
   console.error("nextforge: Failed to load CLI module.");
   console.error(err?.stack || String(err));
-  console.error("\nIf this issue persists, please report it at:");
-  console.error("https://github.com/anthropics/claude-code/issues");
+  console.error(
+    "\nIf this issue persists, check your installation or report it to the maintainers."
+  );
   process.exit(1);
 }
 
 const main = typeof mod.main === "function" ? mod.main : null;
 if (!main) {
   console.error("nextforge: dist/index.js did not export main()");
-  console.error("\nIf this issue persists, please report it at:");
-  console.error("https://github.com/anthropics/claude-code/issues");
+  console.error(
+    "\nIf this issue persists, check your installation or report it to the maintainers."
+  );
   process.exit(1);
 }
 

@@ -30,7 +30,12 @@ async function writeIfAbsent(filePath: string, contents: string, force = false):
   return true;
 }
 
-async function addDockerScriptsToPackageJson(port: number, image: string, force = false) {
+async function addDockerScriptsToPackageJson(
+  port: number,
+  image: string,
+  composeEnabled: boolean,
+  force = false
+) {
   const pkgPath = path.join(process.cwd(), "package.json");
 
   try {
@@ -40,11 +45,15 @@ async function addDockerScriptsToPackageJson(port: number, image: string, force 
     pkg.scripts = pkg.scripts || {};
 
     const scriptsToAdd: Record<string, string> = {
-      "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
-      "docker:down": "docker compose -f docker-compose.dev.yml down",
       "docker:build": `docker build --platform=linux/amd64 -t ${image}:prod .`,
       "docker:run": `docker run --rm --name ${image}-prod -p ${port}:${port} ${image}:prod`,
     };
+
+    // Only add compose scripts if compose is enabled
+    if (composeEnabled) {
+      scriptsToAdd["docker:dev:up"] = "docker compose -f docker-compose.dev.yml up --build";
+      scriptsToAdd["docker:dev:down"] = "docker compose -f docker-compose.dev.yml down";
+    }
 
     let modified = false;
 
@@ -151,7 +160,7 @@ export function registerAddDocker(program: Command) {
           }
 
           // Update package.json with Docker scripts
-          await addDockerScriptsToPackageJson(port, opts.image, !!opts.force);
+          await addDockerScriptsToPackageJson(port, opts.image, composeEnabled, !!opts.force);
 
           // Log results
           if (createdFiles.length) {

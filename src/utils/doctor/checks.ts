@@ -239,6 +239,52 @@ export const appDirCheck: Check = {
   },
 };
 
+export const lockfileCheck: Check = {
+  id: "lockfile",
+  title: "Package manager and lockfile",
+  async run(ctx: CheckContext) {
+    const cwd = ctx.cwd;
+    const lockfiles = {
+      "package-lock.json": "npm",
+      "yarn.lock": "yarn",
+      "pnpm-lock.yaml": "pnpm",
+      "bun.lockb": "bun",
+    };
+
+    const found: string[] = [];
+    for (const [lockfile, pm] of Object.entries(lockfiles)) {
+      try {
+        await fs.access(path.join(cwd, lockfile));
+        found.push(pm);
+      } catch {
+        // Lockfile doesn't exist
+      }
+    }
+
+    if (found.length === 0) {
+      return warn(
+        "No lockfile detected. Run your package manager's install command to create one.",
+        {
+          fix: [
+            "npm install (creates package-lock.json)",
+            "yarn install (creates yarn.lock)",
+            "pnpm install (creates pnpm-lock.yaml)",
+          ],
+        }
+      );
+    }
+
+    if (found.length > 1) {
+      return warn(`Multiple lockfiles found: ${found.join(", ")}. Use only one package manager.`, {
+        details: "Having multiple lockfiles can cause version conflicts and unexpected behavior.",
+        fix: [`Remove lockfiles for package managers you're not using`],
+      });
+    }
+
+    return ok(`Using ${found[0]} (lockfile present)`);
+  },
+};
+
 export const zshQuotingCheck: Check = {
   id: "zsh-quoting",
   title: "zsh quoting issues",
@@ -272,5 +318,5 @@ export const zshQuotingCheck: Check = {
 };
 
 export function getChecks(): Check[] {
-  return [nodeVersionCheck, tsxLoaderCheck, appDirCheck, zshQuotingCheck];
+  return [nodeVersionCheck, lockfileCheck, tsxLoaderCheck, appDirCheck, zshQuotingCheck];
 }

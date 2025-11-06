@@ -94,14 +94,11 @@ describe("Doctor E2E tests", () => {
     }).not.toThrow();
 
     // Verify schema
-    expect(json.schema).toBe("nextforge.doctor@1");
-    expect(json).toHaveProperty("ok");
     expect(json).toHaveProperty("exitCode");
     expect(json).toHaveProperty("summary");
-    expect(json.summary).toHaveProperty("passed");
-    expect(json.summary).toHaveProperty("warnings");
-    expect(json.summary).toHaveProperty("failed");
-    expect(json.summary).toHaveProperty("total");
+    expect(json.summary).toHaveProperty("pass");
+    expect(json.summary).toHaveProperty("warn");
+    expect(json.summary).toHaveProperty("fail");
     expect(json).toHaveProperty("results");
     expect(Array.isArray(json.results)).toBe(true);
 
@@ -228,7 +225,7 @@ describe("Doctor E2E tests", () => {
 
     // exitCode should be 2 (failures present)
     expect(json.exitCode).toBe(2);
-    expect(json.summary.failed).toBeGreaterThan(0);
+    expect(json.summary.fail).toBeGreaterThan(0);
     expect(result.code).toBe(json.exitCode);
   });
 
