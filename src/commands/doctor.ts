@@ -1,6 +1,7 @@
 import { Command } from "commander";
 
 import { runDoctor } from "../utils/doctor/runDoctor.js";
+import { runCommand } from "../utils/runCommand.js";
 
 /**
  * Doctor command - runs health checks for NextForge setup
@@ -23,8 +24,15 @@ export const doctorCommand = new Command("doctor")
   .option("--verbose", "Verbose logging")
   .action(async (opts) => {
     try {
-      const exitCode = await runDoctor(opts);
-      process.exit(exitCode);
+      await runCommand(
+        "doctor",
+        async (logger) => {
+          logger.debug({ opts }, "Doctor command options");
+          const exitCode = await runDoctor(opts);
+          process.exit(exitCode);
+        },
+        { verbose: opts.verbose, silent: opts.json }
+      );
     } catch (err) {
       console.error("Doctor crashed:", err);
       process.exit(3);
