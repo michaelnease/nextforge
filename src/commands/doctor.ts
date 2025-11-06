@@ -22,19 +22,33 @@ export const doctorCommand = new Command("doctor")
   .option("--ci", "CI-friendly mode (no colors, no prompts)")
   .option("--deep", "Run deep checks like tsc validation")
   .option("--verbose", "Verbose logging")
+  .option("--profile", "Enable detailed performance profiling")
+  .option("--metrics <format>", "Output performance metrics (format: json)")
   .action(async (opts) => {
-    try {
-      await runCommand(
-        "doctor",
-        async (logger) => {
-          logger.debug({ opts }, "Doctor command options");
-          const exitCode = await runDoctor(opts);
-          process.exit(exitCode);
-        },
-        { verbose: opts.verbose, silent: opts.json }
-      );
-    } catch (err) {
-      console.error("Doctor crashed:", err);
-      process.exit(3);
-    }
+    await runCommand(
+      "doctor",
+      async ({ logger }) => {
+        logger.debug({ opts }, "Doctor command options");
+        const exitCode = await runDoctor({
+          ...opts,
+          silent: opts.metrics === "json",
+        });
+
+        // If exitCode is non-zero, throw an error with the exitCode property
+        // This allows runCommand to finish, log profile, and set proper exit code
+        if (exitCode !== 0) {
+          const err = new Error(
+            exitCode === 1 ? "Doctor found warnings" : "Doctor found failures"
+          ) as Error & { exitCode: number };
+          err.exitCode = exitCode;
+          throw err;
+        }
+      },
+      {
+        verbose: opts.verbose,
+        silent: opts.json || opts.metrics === "json",
+        profile: opts.profile,
+        metricsJson: opts.metrics === "json",
+      }
+    );
   });

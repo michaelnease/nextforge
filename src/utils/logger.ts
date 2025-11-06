@@ -1,10 +1,13 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import os from "node:os";
 
-import pino from "pino";
+import pinoLogger from "pino";
 import type { Logger } from "pino";
+
+// eslint-disable-next-line import/no-named-as-default-member
+const { multistream, stdTimeFunctions, transport } = pinoLogger;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,11 +15,19 @@ const __dirname = path.dirname(__filename);
 // Get package version
 function getVersion(): string {
   try {
+    // Try relative to __dirname first (works in built ESM)
     const pkgPath = path.join(__dirname, "../../package.json");
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
     return pkg.version || "unknown";
   } catch {
-    return "unknown";
+    // Fallback to cwd/package.json
+    try {
+      const cwdPkgPath = path.join(process.cwd(), "package.json");
+      const pkg = JSON.parse(fs.readFileSync(cwdPkgPath, "utf8"));
+      return pkg.version || "unknown";
+    } catch {
+      return "unknown";
+    }
   }
 }
 
@@ -55,7 +66,7 @@ function isCI(): boolean {
 }
 
 // Get log level from env or flag
-export function getLogLevel(): pino.Level {
+export function getLogLevel(): pinoLogger.Level {
   const level = process.env.NEXTFORGE_LOG_LEVEL?.toLowerCase();
   if (
     level === "error" ||
@@ -132,37 +143,56 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
   const logFilePath = getLogFilePath();
   const fileStream = fs.createWriteStream(logFilePath, { flags: "a" });
 
+  // Handle file stream errors gracefully
+  fileStream.on("error", (err) => {
+    console.warn(`Warning: Failed to write logs to ${logFilePath}: ${err.message}`);
+    // Try to write to temp directory as fallback
+    try {
+      const tempLogPath = path.join(
+        os.tmpdir(),
+        "nextforge-logs",
+        `${new Date().toISOString().split("T")[0]}.log`
+      );
+      fs.mkdirSync(path.dirname(tempLogPath), { recursive: true });
+      console.warn(`Falling back to ${tempLogPath}`);
+    } catch {
+      // Silent fail - don't block execution
+    }
+  });
+
   // For CI or when stdout is not a TTY, use plain JSON
-  const usePlainJson = ci || !process.stdout.isTTY;
+  // Also honor FORCE_JSON_LOGS for predictable local pipes
+  const forceJson = process.env.FORCE_JSON_LOGS === "1" || process.env.FORCE_JSON_LOGS === "true";
+  const usePlainJson = forceJson || ci || !process.stdout.isTTY;
 
   let logger: Logger;
 
   // If silent mode, only log to file
   if (ctx.silent) {
-    logger = pino(
+    logger = pinoLogger(
       {
         level,
         base: baseContext,
-        timestamp: pino.stdTimeFunctions.isoTime,
+        timestamp: stdTimeFunctions.isoTime,
       },
       fileStream
     );
   } else if (usePlainJson) {
     // Plain JSON output for CI
-    logger = pino(
+    logger = pinoLogger(
       {
         level,
         base: baseContext,
-        timestamp: pino.stdTimeFunctions.isoTime,
+        timestamp: stdTimeFunctions.isoTime,
       },
-      pino.multistream([
+      multistream([
         { stream: process.stdout },
         { stream: fileStream, level: "debug" }, // Always write debug+ to file
       ])
     );
   } else {
     // Pretty console output for development
-    const prettyStream = pino.transport({
+    const prettyStream = transport({
       target: "pino-pretty",
       options: {
         colorize: true,
@@ -172,12 +202,12 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
       },
     });
 
-    logger = pino(
+    logger = pinoLogger(
       {
         level,
         base: baseContext,
       },
-      pino.multistream([
+      multistream([
         { stream: prettyStream },
         { stream: fileStream, level: "debug" }, // Always write debug+ to file
       ])

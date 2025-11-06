@@ -71,6 +71,11 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
 
   const exitCode = failed > 0 ? 2 : warned > 0 ? 1 : 0;
 
+  // Skip all output if silent mode (for --metrics=json)
+  if (flags.silent) {
+    return exitCode;
+  }
+
   if (flags.json) {
     console.log(
       JSON.stringify(

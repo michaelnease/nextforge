@@ -30,6 +30,8 @@ export function registerAddPage(program: Command) {
     .option("--group <name>", "Wrap in route group, e.g., auth creates (auth)/route")
     .option("--with-tests", "Create test file", false)
     .option("--verbose", "Verbose logging", false)
+    .option("--profile", "Enable detailed performance profiling")
+    .option("--metrics <format>", "Output performance metrics (format: json)")
     .action(
       async (
         route: string,
@@ -44,18 +46,24 @@ export function registerAddPage(program: Command) {
           group?: string;
           withTests?: boolean;
           verbose?: boolean;
+          profile?: boolean;
+          metrics?: string;
         }
       ) => {
         await runCommand(
           "add:page",
-          async (logger) => {
+          async ({ logger }) => {
             try {
               logger.debug({ route, opts }, "add:page called with options");
               // Check mutually exclusive flags
               if (opts.async && opts.client) {
                 console.error("Choose exactly one of --async or --client");
                 process.exitCode = 1;
-                return;
+                const err = new Error("Choose exactly one of --async or --client") as Error & {
+                  exitCode: number;
+                };
+                err.exitCode = 1;
+                throw err;
               }
 
               // Check --skip-page without --api
@@ -65,7 +73,11 @@ export function registerAddPage(program: Command) {
                   "Hint: use --api to create an API route, or omit --skip-page to create a page"
                 );
                 process.exitCode = 1;
-                return;
+                const err = new Error("Cannot use --skip-page without --api") as Error & {
+                  exitCode: number;
+                };
+                err.exitCode = 1;
+                throw err;
               }
 
               // Validate route
@@ -75,7 +87,11 @@ export function registerAddPage(program: Command) {
                 if (err instanceof Error && err.message === "Invalid segment") {
                   console.error("Invalid segment");
                   process.exitCode = 1;
-                  return;
+                  const validationErr = new Error("Invalid segment") as Error & {
+                    exitCode: number;
+                  };
+                  validationErr.exitCode = 1;
+                  throw validationErr;
                 }
                 throw err;
               }
@@ -151,7 +167,11 @@ export function registerAddPage(program: Command) {
               }
             }
           },
-          { verbose: opts.verbose }
+          {
+            verbose: opts.verbose,
+            profile: opts.profile,
+            metricsJson: opts.metrics === "json",
+          }
         );
       }
     );

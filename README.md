@@ -197,7 +197,10 @@ Configuration values are resolved in the following order (highest to lowest prio
 - `NEXTFORGE_USE_CHAKRA` (`true|false`)
 - `NEXTFORGE_DEFAULT_LAYOUT` (string)
 - `NEXTFORGE_PAGES_DIR` (string)
-- `NEXTFORGE_LOG_LEVEL` (`error|warn|info|debug|trace`) - Set logging verbosity
+- `NEXTFORGE_LOG_LEVEL` (`error|warn|info|debug|trace`) - Set logging verbosity (default: `info`)
+- `NEXTFORGE_PROFILE` (`1|true`) - Enable performance profiling for all commands
+- `NEXTFORGE_METRICS` (`json`) - Output metrics as JSON only (equivalent to --metrics json)
+- `FORCE_JSON_LOGS` (`1|true`) - Force plain JSON output even in TTY (useful for pipes)
 
 ### Logging and Diagnostics
 
@@ -223,11 +226,15 @@ nextforge add:page reports
 
 # Run doctor with verbose output
 nextforge doctor --verbose
+
+# Force JSON output for local pipes (disables pretty printing)
+export FORCE_JSON_LOGS=1
+nextforge add:page reports | jq
 ```
 
 **Log Files:**
 
-All commands automatically write structured JSON logs to `.nextforge/logs/YYYY-MM-DD.log` for auditing and debugging. Each log entry includes:
+All commands automatically write structured JSON logs to `.nextforge/logs/YYYY-MM-DD.log` (e.g., `.nextforge/logs/2025-11-06.log`) for auditing and debugging. Each log entry includes:
 
 - Command name and version
 - Unique run ID (UUID)
@@ -257,8 +264,133 @@ All commands automatically write structured JSON logs to `.nextforge/logs/YYYY-M
 
 - **Development**: Colorized, human-readable output with `pino-pretty`
 - **CI/Production**: Plain JSON output for parsing and analysis
+- **Pipes**: Set `FORCE_JSON_LOGS=1` for predictable JSON in local pipes
 
 **Examples:**
+
+```bash
+# View logs for today
+cat .nextforge/logs/2025-11-06.log
+
+# Filter error logs with jq
+cat .nextforge/logs/2025-11-06.log | jq 'select(.level == 50)'
+
+# Monitor logs in real-time
+tail -f .nextforge/logs/2025-11-06.log | jq
+
+# Debug a specific command
+NEXTFORGE_LOG_LEVEL=debug nextforge add:page reports
+
+# Pipe output as JSON
+FORCE_JSON_LOGS=1 nextforge doctor | jq '.results[] | select(.status == "fail")'
+```
+
+### Performance Profiling
+
+NextForge includes built-in performance profiling to track resource usage and identify bottlenecks in CLI commands.
+
+**Profiling Metrics:**
+
+- **Wall time** - Total execution time
+- **CPU usage** - User and system CPU time (microseconds)
+- **Memory** - Start, peak, and end RSS memory (MB)
+- **Event loop** - Delay percentiles (p50, p90, p99, max) in milliseconds
+- **Garbage collection** - GC events and durations by type
+- **I/O** - File read/write operations and bytes transferred
+
+**Enable Profiling:**
+
+```bash
+# Using command-line flag
+nextforge doctor --profile
+
+# Using environment variable
+export NEXTFORGE_PROFILE=1
+nextforge add:page reports
+
+# Get JSON metrics only (no log output)
+nextforge doctor --metrics json
+nextforge add:page reports --metrics json | jq '.wallMs'
+```
+
+**Human-Readable Output (--profile):**
+
+```bash
+nextforge doctor --profile
+
+# Output:
+Performance Profile:
+wall=132ms  cpuUser=41ms  cpuSys=6ms
+memStart=62 MB → peak 80 MB → end 66 MB
+eventLoop p50=1.2 ms p90=3.8 ms p99=6.4 ms max=12.1 ms
+io reads=3 writes=1 bytesRead=18.2 KB bytesWritten=624 B
+gc scavenge=1 mark-sweep-compact=1 total=4.3 ms
+```
+
+**JSON Metrics (--metrics json):**
+
+```bash
+nextforge doctor --metrics json | jq
+
+# Output:
+{
+  "cmd": "doctor",
+  "ok": true,
+  "wallMs": 132.45,
+  "cpu": {
+    "userMs": 41.23,
+    "systemMs": 6.15
+  },
+  "memory": {
+    "startMB": 62.34,
+    "peakMB": 80.12,
+    "endMB": 66.45
+  },
+  "eventLoop": {
+    "p50": 1.2,
+    "p90": 3.8,
+    "p99": 6.4,
+    "max": 12.1
+  },
+  "io": {
+    "reads": 3,
+    "writes": 1,
+    "bytesRead": 18640,
+    "bytesWritten": 624
+  },
+  "gc": [
+    { "type": "scavenge", "durationMs": 2.1 },
+    { "type": "mark-sweep-compact", "durationMs": 2.2 }
+  ]
+}
+```
+
+**Examples:**
+
+```bash
+# Profile a slow command
+nextforge add:component ComplexForm --profile
+
+# Compare performance across commands
+for cmd in doctor init add:page; do
+  nextforge $cmd --metrics json 2>/dev/null | jq -r '"\(.cmd): \(.wallMs)ms"'
+done
+
+# Monitor memory usage
+nextforge doctor --metrics json | jq '.memory'
+
+# Track GC overhead
+nextforge add:page reports --profile 2>&1 | grep "gc"
+
+# Benchmark with env var
+NEXTFORGE_PROFILE=1 nextforge doctor
+```
+
+**Profiling Overhead:**
+
+The profiling system adds minimal overhead (typically < 5ms) when enabled. Event loop and GC monitoring are only active when `--profile` or `NEXTFORGE_PROFILE=1` is set.
+
+### Component Generation
 
 ```bash
 # Override config with CLI flag
