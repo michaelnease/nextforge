@@ -18,6 +18,7 @@ export interface DoctorFlags {
   ci?: boolean;
   deep?: boolean;
   verbose?: boolean;
+  silent?: boolean;
 }
 
 export async function runDoctor(flags: DoctorFlags): Promise<number> {
