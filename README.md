@@ -197,6 +197,66 @@ Configuration values are resolved in the following order (highest to lowest prio
 - `NEXTFORGE_USE_CHAKRA` (`true|false`)
 - `NEXTFORGE_DEFAULT_LAYOUT` (string)
 - `NEXTFORGE_PAGES_DIR` (string)
+- `NEXTFORGE_LOG_LEVEL` (`error|warn|info|debug|trace`) - Set logging verbosity
+
+### Logging and Diagnostics
+
+NextForge includes built-in structured logging powered by Pino for debugging and monitoring command execution.
+
+**Log Levels:**
+
+- `error` - Only critical errors
+- `warn` - Warnings and errors
+- `info` - General information (default)
+- `debug` - Detailed debugging information
+- `trace` - Very detailed trace information
+
+**Configuration:**
+
+```bash
+# Enable verbose logging with --verbose flag
+nextforge add:page reports --verbose
+
+# Or set log level via environment variable
+export NEXTFORGE_LOG_LEVEL=debug
+nextforge add:page reports
+
+# Run doctor with verbose output
+nextforge doctor --verbose
+```
+
+**Log Files:**
+
+All commands automatically write structured JSON logs to `.nextforge/logs/YYYY-MM-DD.log` for auditing and debugging. Each log entry includes:
+
+- Command name and version
+- Unique run ID (UUID)
+- Node.js version and platform
+- Git SHA (if available)
+- Start/end timestamps
+- Duration and exit code
+- Full error details and stack traces (if any)
+
+**Example log output:**
+
+```json
+{
+  "level": 30,
+  "time": "2025-11-06T18:00:00.000Z",
+  "version": "0.1.0",
+  "nodeVersion": "v22.19.0",
+  "platform": "linux-x64",
+  "cmd": "add:page",
+  "runId": "f5c54e4d-a804-4dc9-a777-ecf7520db2cd",
+  "event": "start",
+  "msg": "Starting command: add:page"
+}
+```
+
+**Console Output:**
+
+- **Development**: Colorized, human-readable output with `pino-pretty`
+- **CI/Production**: Plain JSON output for parsing and analysis
 
 **Examples:**
 
