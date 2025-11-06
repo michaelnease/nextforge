@@ -6,6 +6,7 @@ export const configSchema = z.object({
   defaultLayout: z.string().default("main"),
   pagesDir: z.string().default("app"),
   cursorDir: z.string().default(".nextforge/cursor"),
+  dockerCompose: z.boolean().default(true),
 });
 
 export type NextForgeConfig = z.infer<typeof configSchema>;

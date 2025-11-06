@@ -1,0 +1,33 @@
+# Exclude build artifacts and development files from git archives (GitHub releases, git archive)
+# These are still tracked by git and included in npm packages via package.json "files"
+
+dist/ export-ignore
+node_modules/ export-ignore
+.github/ export-ignore
+.husky/ export-ignore
+.vscode/ export-ignore
+.nextforge/ export-ignore
+
+# Test files
+tests/ export-ignore
+*.test.ts export-ignore
+*.test.js export-ignore
+vitest.config.ts export-ignore
+vitest.config.verify.ts export-ignore
+
+# Development configuration
+.editorconfig export-ignore
+.prettierrc export-ignore
+.prettierignore export-ignore
+.eslintrc.json export-ignore
+.eslintignore export-ignore
+tsconfig.json export-ignore
+
+# Development scripts
+scripts/ export-ignore
+
+# Documentation for contributors (not end users)
+docs/FOR_AI.md export-ignore
+docs/CHANGELOG.md export-ignore
+MODULE_SYSTEM.md export-ignore
+.github/CI_MAINTENANCE.md export-ignore

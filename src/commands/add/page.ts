@@ -3,88 +3,16 @@ import path from "node:path";
 import type { Command } from "commander";
 
 import { loadConfig } from "../../config/loadConfig.js";
+import {
+  generatePageTemplate,
+  generateLayoutTemplate,
+  generateApiRouteTemplate,
+  generatePageTestTemplate,
+} from "../../templates/index.js";
 import { ensureDir, safeWrite } from "../../utils/fsx.js";
 import { updatePageManifest } from "../../utils/manifest.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
 import { validatePageRoute } from "../../utils/validate.js";
-
-/**
- * Generate page template based on async/client flags and route segment.
- */
-function generatePageTemplate(client: boolean, async: boolean, routeSegment?: string): string {
-  // For dynamic routes, extract param name from [slug] or [[...slug]]
-  let content = "<div>page</div>";
-  if (routeSegment) {
-    const match = routeSegment.match(/\[+([^\]]+)\]+/);
-    if (match && match[1]) {
-      const paramName = match[1].replace("...", "");
-      const capitalize = paramName.charAt(0).toUpperCase() + paramName.slice(1);
-      content = `<div>${capitalize}</div>`;
-    }
-  }
-
-  if (client) {
-    return `"use client";
-
-export default function Page() {
-  return ${content};
-}
-`;
-  }
-
-  if (async) {
-    return `export default async function Page() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  return ${content};
-}
-`;
-  }
-
-  // Sync server component
-  return `export default function Page() {
-  return ${content};
-}
-`;
-}
-
-/**
- * Generate layout template based on client flag.
- */
-function generateLayoutTemplate(client: boolean): string {
-  const clientDirective = client ? '"use client";\n\n' : "";
-  return `${clientDirective}export default function Layout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-`;
-}
-
-/**
- * Generate API route template.
- */
-function generateApiRouteTemplate(): string {
-  return `import { NextResponse } from "next/server";
-
-export async function GET() {
-  return NextResponse.json({ ok: true });
-}
-`;
-}
-
-/**
- * Generate page test template.
- */
-function generatePageTestTemplate(route: string): string {
-  return `import Page from "../page";
-import { render, screen } from "@testing-library/react";
-
-describe("page ${route}", () => {
-  it("renders", () => {
-    render(<Page />);
-    expect(screen.getByText(/page/i)).toBeTruthy();
-  });
-});
-`;
-}
 
 export function registerAddPage(program: Command) {
   program
@@ -136,7 +64,7 @@ export function registerAddPage(program: Command) {
           }
 
           // Load config and resolve app directory
-          const config = await loadConfig(process.cwd());
+          const config = await loadConfig({ cwd: process.cwd() });
           const appDir = await resolveAppRoot({
             ...(opts.app && { appFlag: opts.app }),
             ...(config.pagesDir && { configPagesDir: config.pagesDir }),

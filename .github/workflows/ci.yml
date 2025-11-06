@@ -15,9 +15,13 @@ jobs:
         node-version: [18, 22]
 
     steps:
+      # Actions pinned to v4 - review and update periodically
+      # Check for updates at: https://github.com/actions/checkout/releases
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # npm caching enabled to speed up workflow runs
+      # Check for updates at: https://github.com/actions/setup-node/releases
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -51,3 +55,28 @@ jobs:
 
       - name: Test doctor command
         run: node bin/nextforge.js doctor --ci --json
+
+      - name: CLI integration test in temp workspace
+        run: |
+          # Create temporary workspace
+          TEMP_DIR=$(mktemp -d)
+          cd "$TEMP_DIR"
+
+          # Initialize minimal Next.js structure
+          mkdir -p app
+          echo '{}' > package.json
+
+          # Test add:page command with the built CLI
+          node "$GITHUB_WORKSPACE/bin/nextforge.js" add:page Example --app app
+
+          # Verify the page was created
+          if [ -f "app/Example/page.tsx" ]; then
+            echo "✓ CLI successfully created page in temp workspace"
+          else
+            echo "✗ Failed to create page"
+            exit 1
+          fi
+
+          # Cleanup
+          cd "$GITHUB_WORKSPACE"
+          rm -rf "$TEMP_DIR"

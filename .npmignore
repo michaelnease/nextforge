@@ -1,0 +1,48 @@
+# Development and repository files
+.git/
+.github/
+.husky/
+.vscode/
+.idea/
+.claude/
+.cursorrules
+MODULE_SYSTEM.md
+
+# NextForge generated files
+.nextforge/
+
+# Test files
+tests/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+vitest.config.ts
+vitest.config.verify.ts
+
+# Build artifacts
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+coverage/
+.next/
+.turbo/
+
+# Configuration and scripts
+.editorconfig
+.prettierrc
+.prettierignore
+.eslintrc.json
+.eslintignore
+tsconfig.json
+scripts/
+
+# Temporary files
+*.log
+*.lock
+.DS_Store
+node_modules/
+tmp/
+temp/
+
+# Source files (only ship dist/)
+src/

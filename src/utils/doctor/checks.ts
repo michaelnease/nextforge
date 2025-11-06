@@ -82,7 +82,11 @@ export const nodeVersionCheck: Check = {
 
     if (!satisfies(v, range)) {
       return fail(`Node ${v} does not satisfy engines.node "${range}"`, {
-        fix: [`Upgrade Node.js to satisfy "${range}"`, `Use nvm or similar: nvm install ${range}`],
+        fix: [
+          `Upgrade Node.js to satisfy "${range}"`,
+          `nvm install ${range.replace(">=", "")}`,
+          `nvm use ${range.replace(">=", "")}`,
+        ],
       });
     }
 
@@ -116,12 +120,7 @@ export const tsxLoaderCheck: Check = {
       // TS config: require tsx locally installed
       if (!hasLocal("tsx", cwd)) {
         return fail("Found nextforge.config.ts but 'tsx' is not installed locally.", {
-          fix: [
-            "Run: npx nextforge init --yes --force (to regenerate and install tsx)",
-            "npm i -D tsx",
-            "or rename the config to .mjs",
-            'or add "type": "module" and use .js',
-          ],
+          fix: ["npm i -D tsx", "npx nextforge init --yes --force"],
         });
       }
       return ok("nextforge.config.ts with local 'tsx' detected.");
@@ -212,9 +211,10 @@ export const appDirCheck: Check = {
           "No Next.js app directory found. Pass --app <path> or create an app/ folder (or apps/<name>/app in Nx).",
           {
             fix: [
-              "Pass --app <path> to specify the app directory",
-              "Create an app/ or src/app/ folder",
-              "In Nx: create apps/<name>/app",
+              "mkdir -p app",
+              "mkdir -p src/app",
+              "Or pass: --app <path>",
+              "In Nx: mkdir -p apps/<name>/app",
             ],
           }
         );
@@ -265,7 +265,7 @@ export const zshQuotingCheck: Check = {
     return warn(
       'Detected zsh. Quote page args to avoid globbing: `--pages "signin,signup,[slug]"`',
       {
-        fix: ["Add to ~/.zshrc: setopt no_nomatch", "Or always quote bracket arguments"],
+        fix: ['echo "setopt no_nomatch" >> ~/.zshrc', "Or always quote bracket arguments"],
       }
     );
   },
