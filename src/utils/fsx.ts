@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import type { Logger } from "pino";
+
+import { logData } from "./log-data.js";
 import type { Profiler } from "./profiler.js";
 
 /**
@@ -71,9 +74,9 @@ export async function writeIfAbsent(
 export async function safeWrite(
   file: string,
   contents: string,
-  options: { force?: boolean; profiler?: Profiler } = {}
+  options: { force?: boolean; profiler?: Profiler; logger?: Logger } = {}
 ): Promise<void> {
-  const { force, profiler } = options;
+  const { force, profiler, logger } = options;
   if (!force) {
     const fileExists = await exists(file);
     if (fileExists) {
@@ -82,4 +85,13 @@ export async function safeWrite(
   }
   await ensureDir(path.dirname(file));
   await writeText(file, contents, profiler);
+
+  // Log file write confirmation
+  if (logger) {
+    const bytes = Buffer.byteLength(contents, "utf8");
+    logData(logger, `file-written:${path.basename(file)}`, {
+      path: file,
+      bytes,
+    });
+  }
 }

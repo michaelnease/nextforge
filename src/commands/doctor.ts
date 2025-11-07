@@ -24,6 +24,9 @@ export const doctorCommand = new Command("doctor")
   .option("--verbose", "Verbose logging")
   .option("--profile", "Enable detailed performance profiling")
   .option("--metrics <format>", "Output performance metrics (format: json)")
+  .option("--log-data <mode>", "Log data introspection mode: off, summary, full")
+  .option("--redact <keys>", "Additional comma-separated keys to redact")
+  .option("--no-redact", "Disable redaction (local development only)")
   .action(async (opts) => {
     await runCommand(
       "doctor",
@@ -45,10 +48,13 @@ export const doctorCommand = new Command("doctor")
         }
       },
       {
-        verbose: opts.verbose,
+        verbose: !!opts.verbose,
         silent: opts.json || opts.metrics === "json",
         profile: opts.profile,
         metricsJson: opts.metrics === "json",
+        logData: opts.logData,
+        redact: opts.redact,
+        noRedact: opts.noRedact === true,
       }
     );
   });
