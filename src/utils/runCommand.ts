@@ -83,7 +83,7 @@ export async function runCommand<T = void>(
   }
 
   // Log command inputs
-  logData(logger, "command-inputs", {
+  logData(logger, "inputs", {
     command: commandName,
     runId,
     env: {

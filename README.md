@@ -285,6 +285,62 @@ NEXTFORGE_LOG_LEVEL=debug nextforge add:page reports
 FORCE_JSON_LOGS=1 nextforge doctor | jq '.results[] | select(.status == "fail")'
 ```
 
+### Data Introspection
+
+NextForge includes safe data introspection to help debug commands without leaking secrets. Use the `--log-data` flag to inspect command inputs, template variables, and file operations.
+
+**Modes:**
+
+- `off` - No data logging (zero overhead)
+- `summary` - Compact previews with 512 byte limit (default)
+- `full` - Detailed previews with 4096 byte limit
+
+**Quick Start:**
+
+```bash
+# Summary mode - safe for production
+npx nextforge doctor --log-data summary
+
+# Full mode - detailed local debugging
+npx nextforge add:page Dashboard --log-data full
+
+# Or use environment variable
+export NEXTFORGE_LOG_DATA=summary
+npx nextforge add:page Reports
+```
+
+**Security Features:**
+
+- **Automatic Redaction** - Passwords, tokens, API keys, AWS credentials, JWTs automatically masked
+- **Pattern Matching** - Credit cards, emails, OAuth tokens detected and redacted
+- **URL Scrubbing** - Sensitive query parameters (`?token=`, `?key=`) automatically masked
+- **Size Limiting** - Previews truncated to prevent log bloat
+- **Content Hashing** - SHA256 hashes for verification without storing full content
+
+**Custom Redaction:**
+
+```bash
+# Add custom keys to redact
+npx nextforge add:page Contact --log-data summary --redact email,phone,projectId
+
+# Disable redaction for local debugging (⚠️ WARNING: Use only in development!)
+npx nextforge doctor --log-data full --no-redact
+```
+
+**Example Output:**
+
+```json
+{
+  "label": "inputs",
+  "bytes": 119,
+  "hash": "c5273f427c02d665",
+  "preview": "{\"command\":\"doctor\",\"runId\":\"[REDACTED]\"}",
+  "msg": "Data: inputs"
+}
+```
+
+See **[docs/LOGGING_DATA.md](docs/LOGGING_DATA.md)** for complete documentation.
+
 ### Performance Profiling
 
 NextForge includes built-in performance profiling to track resource usage and identify bottlenecks in CLI commands.
