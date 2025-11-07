@@ -207,6 +207,7 @@ export function safePayload(
 export function logData(logger: Logger, label: string, payload: unknown): void {
   const mode = currentMode();
 
+  // Performance: short-circuit early when mode is off
   if (mode === "off") {
     return;
   }
@@ -214,6 +215,7 @@ export function logData(logger: Logger, label: string, payload: unknown): void {
   const maxBytes = mode === "full" ? 4096 : 512;
   const noRedact = process.env.NEXTFORGE_NO_REDACT === "1";
 
+  // Performance: only compute safePayload when mode is not off
   const { bytes, hash, preview } = safePayload(payload, {
     maxPreviewBytes: maxBytes,
     noRedact,

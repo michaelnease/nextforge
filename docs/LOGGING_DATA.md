@@ -30,11 +30,11 @@ npx nextforge doctor
 
 ```json
 {
-  "label": "command-inputs",
+  "label": "inputs",
   "bytes": 119,
   "hash": "c5273f427c02d665",
   "preview": "{\n  \"command\": \"doctor\",\n  \"env\": {},\n  \"nodeVersion\": \"v22.19.0\",\n  \"platform\": \"linux-x64\",\n  \"runId\": \"[REDACTED]\"\n}",
-  "msg": "Data: command-inputs"
+  "msg": "Data: inputs"
 }
 ```
 
@@ -46,10 +46,10 @@ npx nextforge add:page settings --log-data full
 
 This will log:
 
-- `command-inputs` - Command execution context
-- `template-vars:page` - Template generation variables
-- `rendered:page.tsx` - Generated file content preview
-- `file-written:page.tsx` - File write confirmation with path and size
+- `inputs` - Command execution context
+- `template.vars:page` - Template generation variables
+- `file.preview:page.tsx` - Generated file content preview
+- `file.confirm:page.tsx` - File write confirmation with path, size, and hash
 
 ## Redaction
 
@@ -84,12 +84,13 @@ npx nextforge doctor --log-data full --no-redact
 
 ## Integration
 
-Data logging is integrated at key boundaries:
+Data logging is integrated at key boundaries with consistent labels:
 
-- `runCommand` - Command inputs and environment
-- Template generators - Variables and rendered content
-- File operations - Write confirmations with paths and sizes
-- File edits - Compact diffs showing changes
+- `inputs` - Command inputs and environment (from runCommand)
+- `template.vars:*` - Template generation variables
+- `file.preview:*` - Generated file content (respects mode)
+- `file.confirm:*` - Post-write confirmation with path, bytes, hash
+- `file.diff:*` - Compact diffs when updating existing files
 
 ## Performance
 

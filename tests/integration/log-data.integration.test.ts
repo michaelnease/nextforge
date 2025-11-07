@@ -40,8 +40,8 @@ describe("log-data integration", () => {
     });
 
     // Should contain data log entries
-    expect(output).toContain("command-inputs");
-    expect(output).toContain("template-vars:page");
+    expect(output).toContain("inputs");
+    expect(output).toContain("template.vars:page");
     expect(output).toContain("bytes");
     expect(output).toContain("hash");
     expect(output).toContain("preview");
@@ -55,8 +55,8 @@ describe("log-data integration", () => {
     });
 
     // Should NOT contain data log entries
-    expect(output).not.toContain("command-inputs");
-    expect(output).not.toContain("template-vars");
+    expect(output).not.toContain("inputs");
+    expect(output).not.toContain("template.vars");
     expect(output).not.toContain("Data:");
   });
 
@@ -77,7 +77,7 @@ describe("log-data integration", () => {
     expect(outputFull).toContain("Data (full):");
 
     // Full mode previews should be present (we can't easily compare sizes in this test)
-    expect(outputFull).toContain("template-vars:page");
+    expect(outputFull).toContain("template.vars:page");
   });
 
   it("respects NEXTFORGE_LOG_DATA environment variable", () => {
@@ -88,8 +88,8 @@ describe("log-data integration", () => {
     });
 
     // Should NOT contain data log entries when env is "off"
-    expect(output).not.toContain("command-inputs");
-    expect(output).not.toContain("template-vars");
+    expect(output).not.toContain("inputs");
+    expect(output).not.toContain("template.vars");
   });
 
   it("redacts custom keys with --redact flag", () => {
@@ -104,7 +104,7 @@ describe("log-data integration", () => {
     );
 
     // The output should contain data logs
-    expect(output).toContain("command-inputs");
+    expect(output).toContain("inputs");
 
     // Custom redact keys should be applied (we can verify this works by the fact it doesn't error)
   });
@@ -125,7 +125,7 @@ describe("log-data integration", () => {
     }
 
     // Should contain data log entries in default mode
-    expect(output).toContain("command-inputs");
+    expect(output).toContain("inputs");
   });
 
   it("logs file write confirmations", () => {
@@ -135,8 +135,8 @@ describe("log-data integration", () => {
       env: { ...process.env, FORCE_JSON_LOGS: undefined },
     });
 
-    // Should contain file-written logs
-    expect(output).toContain("file-written");
+    // Should contain file confirmation logs
+    expect(output).toContain("file.confirm");
     expect(output).toContain("page.tsx");
   });
 });

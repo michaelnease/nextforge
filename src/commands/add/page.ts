@@ -141,12 +141,12 @@ export function registerAddPage(program: Command) {
                   async: !!opts.async,
                   segment: lastSegment,
                 };
-                logData(logger, "template-vars:page", templateVars);
+                logData(logger, "template.vars:page", templateVars);
 
                 const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
 
-                // Log rendered preview
-                logData(logger, "rendered:page.tsx", { content: template, path: pagePath });
+                // Log rendered preview (content safe-logged based on mode)
+                logData(logger, "file.preview:page.tsx", template);
 
                 await safeWrite(
                   pagePath,

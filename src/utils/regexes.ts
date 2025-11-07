@@ -78,6 +78,36 @@ export const SENSITIVE_VALUE_PATTERNS = {
 } as const;
 
 /**
+ * Scrub sensitive query parameters from URLs
+ */
+function scrubUrlQueryParams(value: string): string {
+  // Match URLs with query params
+  const urlPattern = /(https?:\/\/[^\s?]+)(\?[^\s]*)/gi;
+  return value.replace(urlPattern, (_match, base, query) => {
+    // Redact common sensitive param names
+    const sensitiveParams = [
+      "token",
+      "key",
+      "secret",
+      "password",
+      "auth",
+      "api_key",
+      "apikey",
+      "access_token",
+      "apiToken",
+    ];
+
+    let scrubbedQuery = query;
+    for (const param of sensitiveParams) {
+      const paramPattern = new RegExp(`([?&]${param}=)[^&]*`, "gi");
+      scrubbedQuery = scrubbedQuery.replace(paramPattern, `$1[REDACTED]`);
+    }
+
+    return base + scrubbedQuery;
+  });
+}
+
+/**
  * Check if a value matches any sensitive pattern
  */
 export function isSensitiveValue(value: string): boolean {
@@ -97,10 +127,16 @@ export function redactValue(value: unknown, key?: string, extraKeys: string[] = 
     return "[REDACTED]";
   }
 
-  // For strings, check value patterns
+  // For strings, check value patterns and scrub URLs
   if (typeof value === "string") {
     if (isSensitiveValue(value)) {
       return "[REDACTED]";
+    }
+
+    // Scrub query params from URLs
+    const scrubbed = scrubUrlQueryParams(value);
+    if (scrubbed !== value) {
+      return scrubbed;
     }
   }
 
