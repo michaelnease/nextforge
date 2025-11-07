@@ -10,7 +10,7 @@ import {
   generatePageTestTemplate,
 } from "../../templates/index.js";
 import { ensureDir, safeWrite } from "../../utils/fsx.js";
-import { logData } from "../../utils/log-data.js";
+import { logData, buildPreview, isTextLike } from "../../utils/log-data.js";
 import { updatePageManifest } from "../../utils/manifest.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
 import { runCommand } from "../../utils/runCommand.js";
@@ -146,7 +146,16 @@ export function registerAddPage(program: Command) {
                 const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
 
                 // Log rendered preview (content safe-logged based on mode)
-                logData(logger, "file.preview:page.tsx", template);
+                if (isTextLike(pagePath)) {
+                  const preview = buildPreview(template);
+                  logData(logger, "file.preview:page.tsx", { path: pagePath, ...preview });
+                } else {
+                  // Non-text files: log only path and size
+                  logData(logger, "file.preview:page.tsx", {
+                    path: pagePath,
+                    bytes: Buffer.byteLength(template, "utf8"),
+                  });
+                }
 
                 await safeWrite(
                   pagePath,

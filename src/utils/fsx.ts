@@ -5,7 +5,7 @@ import path from "node:path";
 import type { Logger } from "pino";
 
 import { compactDiff } from "./diff.js";
-import { logData } from "./log-data.js";
+import { logData, isTextLike } from "./log-data.js";
 import type { Profiler } from "./profiler.js";
 
 /**
@@ -69,34 +69,6 @@ export async function writeIfAbsent(
 }
 
 /**
- * Check if a file appears to be binary based on extension
- */
-function isBinaryFile(filePath: string): boolean {
-  const binaryExtensions = [
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".bmp",
-    ".ico",
-    ".pdf",
-    ".zip",
-    ".tar",
-    ".gz",
-    ".woff",
-    ".woff2",
-    ".ttf",
-    ".eot",
-    ".mp4",
-    ".mp3",
-    ".wav",
-    ".avi",
-  ];
-  const ext = path.extname(filePath).toLowerCase();
-  return binaryExtensions.includes(ext);
-}
-
-/**
  * Write file safely with force option.
  * If file exists and force is false, no-op.
  * If force is true, overwrite the file.
@@ -108,11 +80,11 @@ export async function safeWrite(
 ): Promise<void> {
   const { force, profiler, logger } = options;
 
-  // Read old content if updating
+  // Read old content if updating (only for text files)
   let oldContent: string | null = null;
   if (force) {
     const fileExists = await exists(file);
-    if (fileExists && !isBinaryFile(file)) {
+    if (fileExists && isTextLike(file)) {
       try {
         oldContent = await readText(file);
       } catch {
