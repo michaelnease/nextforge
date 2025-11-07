@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schemas.nextforge.dev/cursor-rules.v1.json",
+  "name": "security",
+  "version": 1,
+  "scopes": ["components", "pages", "api"],
+  "rules": [
+    {
+      "id": "naming",
+      "text": "Use PascalCase for components and folders under /app/components/*"
+    },
+    {
+      "id": "tests",
+      "text": "When --with-tests is specified, create *.test.tsx colocated with the component"
+    },
+    {
+      "id": "imports",
+      "text": "Use ESM imports and avoid default exports for better tree-shaking"
+    },
+    {
+      "id": "types",
+      "text": "Add JSDoc comments for public APIs and use TypeScript strict mode"
+    }
+  ],
+  "dos": [
+    "Keep functions small and focused",
+    "Use descriptive variable names",
+    "Add comments for non-obvious code",
+    "Test edge cases"
+  ],
+  "donts": [
+    "Don't modify generated files directly",
+    "Don't skip error handling",
+    "Don't use any types",
+    "Don't commit commented-out code"
+  ]
+}

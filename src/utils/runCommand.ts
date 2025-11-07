@@ -3,6 +3,7 @@ import os from "node:os";
 
 import type { Logger } from "pino";
 
+import { setLogDataMode, setExtraRedactKeys, logData, type LogDataMode } from "./log-data.js";
 import { createLogger } from "./logger.js";
 import { Profiler, formatProfileSummary, type ProfileSummary } from "./profiler.js";
 
@@ -11,6 +12,9 @@ export interface RunCommandOptions {
   silent?: boolean | undefined; // Only log to file, not console
   profile?: boolean | undefined; // Enable detailed profiling
   metricsJson?: boolean | undefined; // Output metrics as JSON only
+  logData?: string | undefined; // Data introspection mode
+  redact?: string | undefined; // Additional keys to redact
+  noRedact?: boolean | undefined; // Disable redaction
 }
 
 export interface CommandContext {
@@ -30,6 +34,25 @@ export async function runCommand<T = void>(
 ): Promise<T> {
   const runId = randomUUID();
   const startTime = Date.now();
+
+  // Set up log data mode
+  if (
+    options.logData &&
+    (options.logData === "off" || options.logData === "summary" || options.logData === "full")
+  ) {
+    setLogDataMode(options.logData as LogDataMode);
+  }
+
+  // Set up extra redact keys
+  if (options.redact) {
+    const extraKeys = options.redact.split(",").map((k) => k.trim());
+    setExtraRedactKeys(extraKeys);
+  }
+
+  // Set no-redact env var if requested
+  if (options.noRedact) {
+    process.env.NEXTFORGE_NO_REDACT = "1";
+  }
 
   // Check for profiling env var
   const enableProfiling =
@@ -58,6 +81,18 @@ export async function runCommand<T = void>(
   if (!metricsJson) {
     logger.info({ event: "start" }, `Starting command: ${commandName}`);
   }
+
+  // Log command inputs
+  logData(logger, "command-inputs", {
+    command: commandName,
+    runId,
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      CI: process.env.CI,
+    },
+    platform: `${os.platform()}-${os.arch()}`,
+    nodeVersion: process.version,
+  });
 
   let profile: ProfileSummary | undefined;
 

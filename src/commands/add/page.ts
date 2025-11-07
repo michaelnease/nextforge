@@ -10,6 +10,7 @@ import {
   generatePageTestTemplate,
 } from "../../templates/index.js";
 import { ensureDir, safeWrite } from "../../utils/fsx.js";
+import { logData } from "../../utils/log-data.js";
 import { updatePageManifest } from "../../utils/manifest.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
 import { runCommand } from "../../utils/runCommand.js";
@@ -32,6 +33,9 @@ export function registerAddPage(program: Command) {
     .option("--verbose", "Verbose logging", false)
     .option("--profile", "Enable detailed performance profiling")
     .option("--metrics <format>", "Output performance metrics (format: json)")
+    .option("--log-data <mode>", "Log data introspection mode: off, summary, full")
+    .option("--redact <keys>", "Additional comma-separated keys to redact")
+    .option("--no-redact", "Disable redaction (local development only)")
     .action(
       async (
         route: string,
@@ -48,6 +52,9 @@ export function registerAddPage(program: Command) {
           verbose?: boolean;
           profile?: boolean;
           metrics?: string;
+          logData?: string;
+          redact?: string;
+          noRedact?: boolean;
         }
       ) => {
         await runCommand(
@@ -127,11 +134,24 @@ export function registerAddPage(program: Command) {
               if (!opts.skipPage) {
                 const pagePath = path.join(pageDir, "page.tsx");
                 const lastSegment = routeSegments[routeSegments.length - 1];
+
+                // Log template variables
+                const templateVars = {
+                  client: !!opts.client,
+                  async: !!opts.async,
+                  segment: lastSegment,
+                };
+                logData(logger, "template-vars:page", templateVars);
+
                 const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
+
+                // Log rendered preview
+                logData(logger, "rendered:page.tsx", { content: template, path: pagePath });
+
                 await safeWrite(
                   pagePath,
                   template,
-                  opts.force ? { force: true, profiler } : { profiler }
+                  opts.force ? { force: true, profiler, logger } : { profiler, logger }
                 );
               }
 
@@ -200,6 +220,9 @@ export function registerAddPage(program: Command) {
             verbose: opts.verbose,
             profile: opts.profile,
             metricsJson: opts.metrics === "json",
+            logData: opts.logData,
+            redact: opts.redact,
+            noRedact: opts.noRedact === true,
           }
         );
       }
