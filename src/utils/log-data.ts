@@ -202,6 +202,28 @@ export function safePayload(
 }
 
 /**
+ * Check if a path or label refers to a text-like file
+ */
+export function isTextLike(pathOrLabel: string): boolean {
+  return /\.(ts|tsx|js|jsx|json|md|css|scss|html|yml|yaml|txt|mjs|cjs)$/i.test(pathOrLabel);
+}
+
+/**
+ * Build a safe preview object for file content
+ * Returns { bytes, hash, preview } respecting current mode
+ */
+export function buildPreview(
+  content: string,
+  opts?: { noRedact?: boolean }
+): { bytes: number; hash: string; preview: string } {
+  const mode = currentMode();
+  const maxBytes = mode === "full" ? 4096 : 512;
+  const noRedact = opts?.noRedact ?? process.env.NEXTFORGE_NO_REDACT === "1";
+
+  return safePayload(content, { maxPreviewBytes: maxBytes, noRedact });
+}
+
+/**
  * Log data safely based on current mode
  */
 export function logData(logger: Logger, label: string, payload: unknown): void {
