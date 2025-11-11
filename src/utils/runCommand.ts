@@ -11,6 +11,7 @@ import {
   clearStoredSpans,
   formatTraceTree,
 } from "../core/tracing.js";
+
 import { setLogDataMode, setExtraRedactKeys, logData, type LogDataMode } from "./log-data.js";
 import { createLogger } from "./logger.js";
 import { Profiler, formatProfileSummary, type ProfileSummary } from "./profiler.js";
