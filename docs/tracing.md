@@ -265,6 +265,4 @@ If span nesting looks wrong:
 
 ## Related
 
-- [Logging](./logging.md) - Structured logging and data introspection
-- [Profiling](./profiling.md) - Performance profiling and metrics
-- [Testing](./testing.md) - Testing with traces in integration tests
+- [Logging Data](./LOGGING_DATA.md) - Structured logging and data introspection

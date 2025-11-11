@@ -26,15 +26,23 @@ const asyncLocalStorage = new AsyncLocalStorage<TraceContext>();
 
 /**
  * Get the current trace context from AsyncLocalStorage
+ * Lazily creates a trace context if one doesn't exist
  */
 export function getTraceContext(): {
   traceId: string;
   spanId?: string | undefined;
   parentId?: string | undefined;
 } {
-  const context = asyncLocalStorage.getStore();
+  let context = asyncLocalStorage.getStore();
+
+  // Lazily create trace context if it doesn't exist
   if (!context) {
-    return { traceId: "" };
+    setTraceId();
+    context = asyncLocalStorage.getStore();
+    if (!context) {
+      // Fallback - should never happen but prevents empty traceId
+      return { traceId: process.env.NEXTFORGE_TRACE_ID || randomUUID() };
+    }
   }
 
   const currentSpan = context.spanStack[context.spanStack.length - 1];
