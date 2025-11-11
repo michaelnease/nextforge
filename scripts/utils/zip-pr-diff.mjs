@@ -137,7 +137,7 @@ function main() {
       }
     })();
     const shortHead = run(`git rev-parse --short ${head}`);
-    const outDir = path.join("scripts", "temp");
+    const outDir = path.join(process.cwd(), "scripts", "temp");
     if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
     const zipName = `pr-diff-${branch}-${shortHead}-${nowStamp()}.zip`;
     const zipPath = path.join(outDir, zipName);

@@ -108,10 +108,12 @@ export async function runCommand<T = void>(
   });
 
   let profile: ProfileSummary | undefined;
+  let result: T | undefined;
+  let error: unknown = null;
 
   try {
     // Execute the command action wrapped in a span
-    const result = await withTrackedSpan(`command:${commandName}`, async () => {
+    result = await withTrackedSpan(`command:${commandName}`, async () => {
       return await action({ logger, profiler });
     });
 
@@ -124,9 +126,6 @@ export async function runCommand<T = void>(
 
     // Finish profiling
     profile = profiler.finish(true);
-
-    // Get trace context for final log
-    const { traceId } = getTraceContext();
 
     // Output metrics JSON if requested
     if (metricsJson) {
@@ -147,29 +146,6 @@ export async function runCommand<T = void>(
       `Command completed successfully in ${duration}s`
     );
 
-    // Log final command complete summary
-    logger.info(
-      {
-        msg: "command complete",
-        command: commandName,
-        totalMs,
-        traceId,
-      },
-      `Command complete: ${commandName}`
-    );
-
-    // Output human-readable trace tree if --trace flag is set
-    if (options.trace && !options.silent && traceId) {
-      const spans = getStoredSpans(traceId);
-      if (spans.length > 0) {
-        console.log("\nTrace:");
-        const tree = formatTraceTree(spans);
-        tree.forEach((line) => console.log(line));
-        console.log();
-      }
-      clearStoredSpans(traceId);
-    }
-
     // Log human-readable profile summary if profiling enabled
     if (enableProfiling && !options.silent) {
       console.log("\nPerformance Profile:");
@@ -178,6 +154,8 @@ export async function runCommand<T = void>(
 
     return result;
   } catch (err) {
+    error = err;
+
     // Calculate duration
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     const totalMs = Date.now() - startTime;
@@ -190,9 +168,6 @@ export async function runCommand<T = void>(
 
     // Finish profiling with error
     profile = profiler.finish(false, err);
-
-    // Get trace context for final log
-    const { traceId } = getTraceContext();
 
     // Output metrics JSON if requested
     if (metricsJson) {
@@ -246,16 +221,42 @@ export async function runCommand<T = void>(
       `Command ${statusMessage} after ${duration}s: ${err instanceof Error ? err.message : String(err)}`
     );
 
-    // Log final command complete summary (even on failure)
+    // Log human-readable profile summary if profiling enabled
+    if (enableProfiling && !options.silent) {
+      const profileLabel =
+        exitCode === 1 ? "Performance Profile (warnings):" : "Performance Profile (failed):";
+      console.log(`\n${profileLabel}`);
+      console.log(formatProfileSummary(profile));
+    }
+
+    // Set process exit code
+    process.exitCode = exitCode;
+
+    // Re-throw for tests to catch, but not in production/CI
+    if (process.env.NODE_ENV === "test") {
+      throw err;
+    }
+
+    // Return undefined to satisfy TypeScript - process.exitCode is already set
+    return undefined as unknown as T;
+  } finally {
+    // Always emit final summary and trace tree (success or failure)
+    const totalMs = Date.now() - startTime;
+    const { traceId } = getTraceContext();
+    const exitCode = process.exitCode || 0;
+
+    // Log final command complete summary
     logger.info(
       {
         msg: "command complete",
         command: commandName,
+        ok: !error,
+        errorName: error && (error as Error).name,
         totalMs,
         traceId,
         exitCode,
       },
-      `Command complete: ${commandName} (exit ${exitCode})`
+      `Command complete: ${commandName}${exitCode !== 0 ? ` (exit ${exitCode})` : ""}`
     );
 
     // Output human-readable trace tree if --trace flag is set
@@ -269,26 +270,5 @@ export async function runCommand<T = void>(
       }
       clearStoredSpans(traceId);
     }
-
-    // Log human-readable profile summary if profiling enabled
-    if (enableProfiling && !options.silent) {
-      const profileLabel =
-        exitCode === 1 ? "Performance Profile (warnings):" : "Performance Profile (failed):";
-      console.log(`\n${profileLabel}`);
-      console.log(formatProfileSummary(profile));
-    }
-
-    // Set process exit code
-    process.exitCode = exitCode;
-
-    // Re-throw for tests to catch, but not in production/CI
-    // In silent mode (--json, --metrics json), we've already output everything needed
-    // so exit gracefully without throwing to avoid stack traces in CI
-    if (process.env.NODE_ENV === "test") {
-      throw err;
-    }
-
-    // Return undefined to satisfy TypeScript - process.exitCode is already set
-    return undefined as unknown as T;
   }
 }
