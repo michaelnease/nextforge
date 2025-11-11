@@ -12,9 +12,9 @@ import { cssModuleTemplate, storyTemplate } from "../../templates/index.js";
 import { flagsFrom, resolveFramework } from "../../utils/framework.js";
 import { ensureDir, safeWrite } from "../../utils/fsx.js";
 import { updateComponentManifest } from "../../utils/manifest.js";
-import { runCommand } from "../../utils/runCommand.js";
 import { type Group } from "../../utils/paths.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
+import { runCommand } from "../../utils/runCommand.js";
 
 export function registerAddComponent(program: Command) {
   program

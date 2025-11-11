@@ -18,7 +18,7 @@ async function addDockerScriptsToPackageJson(
   image: string,
   composeEnabled: boolean,
   force: boolean,
-  logger: any
+  logger: { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void }
 ) {
   const pkgPath = path.join(process.cwd(), "package.json");
 
