@@ -171,17 +171,11 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
 
   // Mixin to inject trace context into every log entry
   const traceMixin = () => {
-    const traceContext = getTraceContext();
-    const result: Record<string, string> = {};
-
-    if (traceContext.traceId) {
-      result.traceId = traceContext.traceId;
-    }
-    if (traceContext.spanId) {
-      result.spanId = traceContext.spanId;
-    }
-
-    return result;
+    const { traceId, spanId } = getTraceContext();
+    const out: Record<string, string> = {};
+    if (traceId) out.traceId = traceId;
+    if (spanId) out.spanId = spanId;
+    return out;
   };
 
   // If silent mode, only log to file

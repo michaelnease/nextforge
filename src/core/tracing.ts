@@ -27,29 +27,36 @@ const asyncLocalStorage = new AsyncLocalStorage<TraceContext>();
 /**
  * Get the current trace context from AsyncLocalStorage
  * Lazily creates a trace context if one doesn't exist
+ * Guarantees a non-empty traceId is always returned
  */
 export function getTraceContext(): {
   traceId: string;
   spanId?: string | undefined;
   parentId?: string | undefined;
 } {
-  let context = asyncLocalStorage.getStore();
+  let store = asyncLocalStorage.getStore();
 
-  // Lazily create trace context if it doesn't exist
-  if (!context) {
-    setTraceId();
-    context = asyncLocalStorage.getStore();
-    if (!context) {
-      // Fallback - should never happen but prevents empty traceId
-      return { traceId: process.env.NEXTFORGE_TRACE_ID || randomUUID() };
+  // Lazily initialize traceId if missing
+  if (!store?.traceId) {
+    const envId = process.env.NEXTFORGE_TRACE_ID?.trim();
+    const id = envId && envId.length > 0 ? envId : randomUUID();
+
+    if (store) {
+      // Store exists but traceId is missing - set it
+      store.traceId = id;
+      store.spanStack ||= [];
+    } else {
+      // No store exists - create one
+      asyncLocalStorage.enterWith({ traceId: id, spanStack: [] });
+      store = asyncLocalStorage.getStore()!;
     }
   }
 
-  const currentSpan = context.spanStack[context.spanStack.length - 1];
+  const top = store!.spanStack[store!.spanStack.length - 1];
   return {
-    traceId: context.traceId,
-    spanId: currentSpan?.id ?? undefined,
-    parentId: currentSpan?.parentId ?? undefined,
+    traceId: store!.traceId,
+    spanId: top?.id,
+    parentId: top?.parentId,
   };
 }
 

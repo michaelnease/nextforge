@@ -248,15 +248,15 @@ export async function runCommand<T = void>(
     // Log final command complete summary
     logger.info(
       {
-        msg: "command complete",
         command: commandName,
         ok: !error,
-        errorName: error && (error as Error).name,
+        errorName: error ? (error as Error).name : undefined,
+        errorMessage: error ? (error as Error).message : undefined,
         totalMs,
         traceId,
         exitCode,
       },
-      `Command complete: ${commandName}${exitCode !== 0 ? ` (exit ${exitCode})` : ""}`
+      `command complete`
     );
 
     // Output human-readable trace tree if --trace flag is set

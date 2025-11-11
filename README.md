@@ -566,7 +566,12 @@ export interface CounterProps {
 }
 
 export default function Counter({ title, subtitle }: CounterProps) {
-  // ...
+  return (
+    <div>
+      {title && <h2>{title}</h2>}
+      {subtitle && <p>{subtitle}</p>}
+    </div>
+  );
 }
 ```
 
