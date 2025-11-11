@@ -6,6 +6,8 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 
 - **[Changelog](docs/CHANGELOG.md)** - Version history and release notes
 - **[Contributor Guide](docs/FOR_AI.md)** - Editing guide for contributors and AI assistants
+- **[Distributed Tracing](docs/tracing.md)** - Trace correlation and span trees
+- **[Data Introspection](docs/LOGGING_DATA.md)** - Safe data logging and debugging
 - **[License](docs/LICENSE)** - MIT License
 
 ---
@@ -197,8 +199,314 @@ Configuration values are resolved in the following order (highest to lowest prio
 - `NEXTFORGE_USE_CHAKRA` (`true|false`)
 - `NEXTFORGE_DEFAULT_LAYOUT` (string)
 - `NEXTFORGE_PAGES_DIR` (string)
+- `NEXTFORGE_LOG_LEVEL` (`error|warn|info|debug|trace`) - Set logging verbosity (default: `info`)
+- `NEXTFORGE_PROFILE` (`1|true`) - Enable performance profiling for all commands
+- `NEXTFORGE_METRICS` (`json`) - Output metrics as JSON only (equivalent to --metrics json)
+- `FORCE_JSON_LOGS` (`1|true`) - Force plain JSON output even in TTY (useful for pipes)
+
+### Logging and Diagnostics
+
+NextForge includes built-in structured logging powered by Pino for debugging and monitoring command execution.
+
+**Log Levels:**
+
+- `error` - Only critical errors
+- `warn` - Warnings and errors
+- `info` - General information (default)
+- `debug` - Detailed debugging information
+- `trace` - Very detailed trace information
+
+**Configuration:**
+
+```bash
+# Enable verbose logging with --verbose flag
+nextforge add:page reports --verbose
+
+# Or set log level via environment variable
+export NEXTFORGE_LOG_LEVEL=debug
+nextforge add:page reports
+
+# Run doctor with verbose output
+nextforge doctor --verbose
+
+# Force JSON output for local pipes (disables pretty printing)
+export FORCE_JSON_LOGS=1
+nextforge add:page reports | jq
+```
+
+**Log Files:**
+
+All commands automatically write structured JSON logs to `.nextforge/logs/YYYY-MM-DD.log` (e.g., `.nextforge/logs/2025-11-06.log`) for auditing and debugging. Each log entry includes:
+
+- Command name and version
+- Unique run ID (UUID)
+- Node.js version and platform
+- Git SHA (if available)
+- Start/end timestamps
+- Duration and exit code
+- Full error details and stack traces (if any)
+
+**Example log output:**
+
+```json
+{
+  "level": 30,
+  "time": "2025-11-06T18:00:00.000Z",
+  "version": "0.1.0",
+  "nodeVersion": "v22.19.0",
+  "platform": "linux-x64",
+  "cmd": "add:page",
+  "runId": "f5c54e4d-a804-4dc9-a777-ecf7520db2cd",
+  "event": "start",
+  "msg": "Starting command: add:page"
+}
+```
+
+**Console Output:**
+
+- **Development**: Colorized, human-readable output with `pino-pretty`
+- **CI/Production**: Plain JSON output for parsing and analysis
+- **Pipes**: Set `FORCE_JSON_LOGS=1` for predictable JSON in local pipes
 
 **Examples:**
+
+```bash
+# View logs for today
+cat .nextforge/logs/2025-11-06.log
+
+# Filter error logs with jq
+cat .nextforge/logs/2025-11-06.log | jq 'select(.level == 50)'
+
+# Monitor logs in real-time
+tail -f .nextforge/logs/2025-11-06.log | jq
+
+# Debug a specific command
+NEXTFORGE_LOG_LEVEL=debug nextforge add:page reports
+
+# Pipe output as JSON
+FORCE_JSON_LOGS=1 nextforge doctor | jq '.results[] | select(.status == "fail")'
+```
+
+### Data Introspection
+
+NextForge includes safe data introspection to help debug commands without leaking secrets. Use the `--log-data` flag to inspect command inputs, template variables, and file operations.
+
+**Modes:**
+
+- `off` - No data logging (zero overhead)
+- `summary` - Compact previews with 512 byte limit (default)
+- `full` - Detailed previews with 4096 byte limit
+
+**Quick Start:**
+
+```bash
+# Summary mode - safe for production
+npx nextforge doctor --log-data summary
+
+# Full mode - detailed local debugging
+npx nextforge add:page Dashboard --log-data full
+
+# Or use environment variable
+export NEXTFORGE_LOG_DATA=summary
+npx nextforge add:page Reports
+```
+
+**Security Features:**
+
+- **Automatic Redaction** - Passwords, tokens, API keys, AWS credentials, JWTs automatically masked
+- **Pattern Matching** - Credit cards, emails, OAuth tokens detected and redacted
+- **URL Scrubbing** - Sensitive query parameters (`?token=`, `?key=`) automatically masked
+- **Size Limiting** - Previews truncated to prevent log bloat
+- **Content Hashing** - SHA256 hashes for verification without storing full content
+
+**Custom Redaction:**
+
+```bash
+# Add custom keys to redact
+npx nextforge add:page Contact --log-data summary --redact email,phone,projectId
+
+# Disable redaction for local debugging (⚠️ WARNING: Use only in development!)
+npx nextforge doctor --log-data full --no-redact
+```
+
+**Example Output:**
+
+```json
+{
+  "label": "inputs",
+  "bytes": 119,
+  "hash": "c5273f427c02d665",
+  "preview": "{\"command\":\"doctor\",\"runId\":\"[REDACTED]\"}",
+  "msg": "Data: inputs"
+}
+```
+
+See **[docs/LOGGING_DATA.md](docs/LOGGING_DATA.md)** for complete documentation.
+
+### Performance Profiling
+
+NextForge includes built-in performance profiling to track resource usage and identify bottlenecks in CLI commands.
+
+**Profiling Metrics:**
+
+- **Wall time** - Total execution time
+- **CPU usage** - User and system CPU time (microseconds)
+- **Memory** - Start, peak, and end RSS memory (MB)
+- **Event loop** - Delay percentiles (p50, p90, p99, max) in milliseconds
+- **Garbage collection** - GC events and durations by type
+- **I/O** - File read/write operations and bytes transferred
+
+**Enable Profiling:**
+
+```bash
+# Using command-line flag
+nextforge doctor --profile
+
+# Using environment variable
+export NEXTFORGE_PROFILE=1
+nextforge add:page reports
+
+# Get JSON metrics only (no log output)
+nextforge doctor --metrics json
+nextforge add:page reports --metrics json | jq '.wallMs'
+```
+
+**Human-Readable Output (--profile):**
+
+```bash
+nextforge doctor --profile
+
+# Output:
+Performance Profile:
+wall=132ms  cpuUser=41ms  cpuSys=6ms
+memStart=62 MB → peak 80 MB → end 66 MB
+eventLoop p50=1.2 ms p90=3.8 ms p99=6.4 ms max=12.1 ms
+io reads=3 writes=1 bytesRead=18.2 KB bytesWritten=624 B
+gc scavenge=1 mark-sweep-compact=1 total=4.3 ms
+```
+
+**JSON Metrics (--metrics json):**
+
+```bash
+nextforge doctor --metrics json | jq
+
+# Output:
+{
+  "cmd": "doctor",
+  "ok": true,
+  "wallMs": 132.45,
+  "cpu": {
+    "userMs": 41.23,
+    "systemMs": 6.15
+  },
+  "memory": {
+    "startMB": 62.34,
+    "peakMB": 80.12,
+    "endMB": 66.45
+  },
+  "eventLoop": {
+    "p50": 1.2,
+    "p90": 3.8,
+    "p99": 6.4,
+    "max": 12.1
+  },
+  "io": {
+    "reads": 3,
+    "writes": 1,
+    "bytesRead": 18640,
+    "bytesWritten": 624
+  },
+  "gc": [
+    { "type": "scavenge", "durationMs": 2.1 },
+    { "type": "mark-sweep-compact", "durationMs": 2.2 }
+  ]
+}
+```
+
+**Quick Examples:**
+
+```bash
+# Get performance summary
+npx nextforge doctor --profile
+
+# Save metrics to file
+npx nextforge add:page about --metrics json > .nextforge/last.json
+
+# View I/O stats
+npx nextforge add:page reports --metrics json | jq '.io'
+
+# Check step timings
+npx nextforge add:page dashboard --metrics json | jq '.steps'
+
+# Compare commands
+for cmd in doctor "add:page test" "add:component Button"; do
+  echo -n "$cmd: "
+  npx nextforge $cmd --metrics json 2>/dev/null | jq -r '.wallMs + "ms"'
+done
+
+# Monitor memory across runs
+npx nextforge add:page users --metrics json | jq '.memory | {peak: .peakMB, delta: (.endMB - .startMB)}'
+```
+
+**Profiling Overhead:**
+
+The profiling system adds minimal overhead (typically < 5ms) when enabled. Event loop and GC monitoring are only active when `--profile` or `NEXTFORGE_PROFILE=1` is set.
+
+### Distributed Tracing
+
+NextForge includes built-in distributed tracing to correlate logs across command execution and visualize operation hierarchies.
+
+**Features:**
+
+- **Trace IDs** - Correlate all logs from a single command execution
+- **Span IDs** - Track individual operations within a command
+- **Duration measurements** - Performance analysis for each operation
+- **Hierarchical span trees** - Visual representation of operation nesting
+
+**View Trace Trees:**
+
+```bash
+# Show trace tree after command execution
+nextforge doctor --trace
+
+# Output:
+Trace:
+command:doctor (7.29 ms)
+```
+
+For complex operations with nested spans:
+
+```bash
+nextforge add:component Button --trace
+
+# Output:
+Trace:
+command:add:component (45.2 ms)
+  step:loadConfig (12.3 ms)
+  step:writeFiles (28.1 ms)
+    write:Button.tsx (15.4 ms)
+    write:index.ts (8.2 ms)
+```
+
+**Custom Trace IDs:**
+
+```bash
+# Set a custom trace ID for correlation across logs
+NEXTFORGE_TRACE_ID=my-custom-id nextforge doctor
+
+# All logs will include: "traceId": "my-custom-id"
+```
+
+**Combine with Profiling:**
+
+```bash
+# Get both trace tree and performance metrics
+nextforge add:page Dashboard --trace --profile
+```
+
+See **[docs/tracing.md](docs/tracing.md)** for complete documentation.
+
+### Component Generation
 
 ```bash
 # Override config with CLI flag
@@ -314,7 +622,12 @@ export interface CounterProps {
 }
 
 export default function Counter({ title, subtitle }: CounterProps) {
-  // ...
+  return (
+    <div>
+      {title && <h2>{title}</h2>}
+      {subtitle && <p>{subtitle}</p>}
+    </div>
+  );
 }
 ```
 

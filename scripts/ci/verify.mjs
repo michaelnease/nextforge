@@ -2,6 +2,12 @@
 import { execSync } from "node:child_process";
 
 const steps = [
+  {
+    name: "Check for stray ellipses",
+    // Only catch problematic placeholder comments like "// ..." that aren't documentation
+    // This excludes legitimate uses in route examples like "[...slug]"
+    cmd: "bash -c '! grep -R --line-number -E \"^[[:space:]]*//[[:space:]]*\\.\\.\\.([[:space:]]*|$)\" src README.md'",
+  },
   { name: "Lint", cmd: "npm run lint" },
   { name: "Format check", cmd: "npm run format:check" },
   { name: "Type check", cmd: "npm run typecheck" },

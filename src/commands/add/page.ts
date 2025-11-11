@@ -10,8 +10,10 @@ import {
   generatePageTestTemplate,
 } from "../../templates/index.js";
 import { ensureDir, safeWrite } from "../../utils/fsx.js";
+import { logData, buildPreview } from "../../utils/log-data.js";
 import { updatePageManifest } from "../../utils/manifest.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
+import { runCommand } from "../../utils/runCommand.js";
 import { validatePageRoute } from "../../utils/validate.js";
 
 export function registerAddPage(program: Command) {
@@ -28,6 +30,13 @@ export function registerAddPage(program: Command) {
     .option("--skip-page", "Skip creating page.tsx (use with --api)", false)
     .option("--group <name>", "Wrap in route group, e.g., auth creates (auth)/route")
     .option("--with-tests", "Create test file", false)
+    .option("--verbose", "Verbose logging", false)
+    .option("--profile", "Enable detailed performance profiling")
+    .option("--trace", "Output trace tree showing spans and durations")
+    .option("--metrics <format>", "Output performance metrics (format: json)")
+    .option("--log-data <mode>", "Log data introspection mode: off, summary, full")
+    .option("--redact <keys>", "Additional comma-separated keys to redact")
+    .option("--no-redact", "Disable redaction (local development only)")
     .action(
       async (
         route: string,
@@ -41,106 +50,185 @@ export function registerAddPage(program: Command) {
           skipPage?: boolean;
           group?: string;
           withTests?: boolean;
+          verbose?: boolean;
+          profile?: boolean;
+          trace?: boolean;
+          metrics?: string;
+          logData?: string;
+          redact?: string;
+          noRedact?: boolean;
         }
       ) => {
-        try {
-          // Check mutually exclusive flags
-          if (opts.async && opts.client) {
-            console.error("Choose exactly one of --async or --client");
-            process.exitCode = 1;
-            return;
-          }
+        await runCommand(
+          "add:page",
+          async ({ logger, profiler }) => {
+            try {
+              logger.debug({ route, opts }, "add:page called with options");
 
-          // Check --skip-page without --api
-          if (opts.skipPage && !opts.api) {
-            console.error("Cannot use --skip-page without --api");
-            console.error(
-              "Hint: use --api to create an API route, or omit --skip-page to create a page"
-            );
-            process.exitCode = 1;
-            return;
-          }
+              // Validation step
+              const validateStep = profiler.step("validate options and route");
 
-          // Validate route
-          try {
-            validatePageRoute(route);
-          } catch (err) {
-            if (err instanceof Error && err.message === "Invalid segment") {
-              console.error("Invalid segment");
-              process.exitCode = 1;
-              return;
+              // Check mutually exclusive flags
+              if (opts.async && opts.client) {
+                console.error("Choose exactly one of --async or --client");
+                process.exitCode = 1;
+                const err = new Error("Choose exactly one of --async or --client") as Error & {
+                  exitCode: number;
+                };
+                err.exitCode = 1;
+                throw err;
+              }
+
+              // Check --skip-page without --api
+              if (opts.skipPage && !opts.api) {
+                console.error("Cannot use --skip-page without --api");
+                console.error(
+                  "Hint: use --api to create an API route, or omit --skip-page to create a page"
+                );
+                process.exitCode = 1;
+                const err = new Error("Cannot use --skip-page without --api") as Error & {
+                  exitCode: number;
+                };
+                err.exitCode = 1;
+                throw err;
+              }
+
+              // Validate route
+              try {
+                validatePageRoute(route);
+              } catch (err) {
+                if (err instanceof Error && err.message === "Invalid segment") {
+                  console.error("Invalid segment");
+                  process.exitCode = 1;
+                  const validationErr = new Error("Invalid segment") as Error & {
+                    exitCode: number;
+                  };
+                  validationErr.exitCode = 1;
+                  throw validationErr;
+                }
+                throw err;
+              }
+
+              validateStep.end();
+
+              // Load config and resolve app directory
+              const configStep = profiler.step("load config");
+              const config = await loadConfig({ cwd: process.cwd() });
+              const appDir = await resolveAppRoot({
+                ...(opts.app && { appFlag: opts.app }),
+                ...(config.pagesDir && { configPagesDir: config.pagesDir }),
+                createIfMissing: false, // pages must error if the app dir is missing
+              });
+              configStep.end();
+
+              // Generate page path with optional route group
+              const generateStep = profiler.step("generate files");
+              let routeSegments = route.split("/").filter(Boolean);
+              if (opts.group) {
+                // Wrap in route group: (groupName)
+                const groupName = opts.group.startsWith("(") ? opts.group : `(${opts.group})`;
+                routeSegments = [groupName, ...routeSegments];
+              }
+              const pageDir = path.join(appDir, ...routeSegments);
+              await ensureDir(pageDir);
+
+              // Write page file unless --skip-page is set
+              if (!opts.skipPage) {
+                const pagePath = path.join(pageDir, "page.tsx");
+                const lastSegment = routeSegments[routeSegments.length - 1];
+
+                // Log template variables
+                const templateVars = {
+                  client: !!opts.client,
+                  async: !!opts.async,
+                  segment: lastSegment,
+                };
+                logData(logger, "template.vars:page", templateVars);
+
+                const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
+
+                // Log rendered preview (content safe-logged based on mode)
+                const preview = buildPreview(template);
+                logData(logger, "file.preview:page.tsx", { path: pagePath, ...preview });
+
+                await safeWrite(
+                  pagePath,
+                  template,
+                  opts.force ? { force: true, profiler, logger } : { profiler, logger }
+                );
+              }
+
+              // Write layout file if --layout is set
+              if (opts.layout) {
+                const layoutPath = path.join(pageDir, "layout.tsx");
+                const layoutTemplate = generateLayoutTemplate(!!opts.client);
+                await safeWrite(
+                  layoutPath,
+                  layoutTemplate,
+                  opts.force ? { force: true, profiler } : { profiler }
+                );
+              }
+
+              // Write API route file if --api is set
+              if (opts.api) {
+                const apiPath = path.join(pageDir, "route.ts");
+                const apiTemplate = generateApiRouteTemplate();
+                await safeWrite(
+                  apiPath,
+                  apiTemplate,
+                  opts.force ? { force: true, profiler } : { profiler }
+                );
+              }
+
+              // Write test file if --with-tests is set
+              if (opts.withTests) {
+                const testDir = path.join(pageDir, "__tests__");
+                await ensureDir(testDir);
+                const testPath = path.join(testDir, "page.test.tsx");
+                const testTemplate = generatePageTestTemplate(route);
+                await safeWrite(
+                  testPath,
+                  testTemplate,
+                  opts.force ? { force: true, profiler } : { profiler }
+                );
+              }
+
+              generateStep.end();
+
+              // Update page manifest
+              const manifestStep = profiler.step("update manifest");
+              const manifestRoute = routeSegments.join("/");
+              await updatePageManifest(appDir, manifestRoute);
+              manifestStep.end();
+
+              logger.info({ route: manifestRoute }, "Page created successfully");
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              if (msg.includes("Invalid segment") || msg.toLowerCase().includes("invalid")) {
+                console.error("Invalid segment");
+                process.exitCode = 1;
+                throw err; // Re-throw for tests
+              } else if (msg.includes("App directory not found")) {
+                console.error(msg);
+                process.exitCode = 1;
+                throw err; // Re-throw for tests
+              } else {
+                console.error(msg);
+                process.exitCode = 1;
+                throw err; // Re-throw for tests
+              }
             }
-            throw err;
+          },
+          {
+            verbose: opts.verbose,
+            profile: opts.profile,
+            trace: opts.trace,
+            metricsJson: opts.metrics === "json",
+            logData: opts.logData,
+            redact: opts.redact,
+            noRedact: opts.noRedact === true,
           }
-
-          // Load config and resolve app directory
-          const config = await loadConfig({ cwd: process.cwd() });
-          const appDir = await resolveAppRoot({
-            ...(opts.app && { appFlag: opts.app }),
-            ...(config.pagesDir && { configPagesDir: config.pagesDir }),
-            createIfMissing: false, // pages must error if the app dir is missing
-          });
-
-          // Generate page path with optional route group
-          let routeSegments = route.split("/").filter(Boolean);
-          if (opts.group) {
-            // Wrap in route group: (groupName)
-            const groupName = opts.group.startsWith("(") ? opts.group : `(${opts.group})`;
-            routeSegments = [groupName, ...routeSegments];
-          }
-          const pageDir = path.join(appDir, ...routeSegments);
-          await ensureDir(pageDir);
-
-          // Write page file unless --skip-page is set
-          if (!opts.skipPage) {
-            const pagePath = path.join(pageDir, "page.tsx");
-            const lastSegment = routeSegments[routeSegments.length - 1];
-            const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
-            await safeWrite(pagePath, template, opts.force ? { force: true } : {});
-          }
-
-          // Write layout file if --layout is set
-          if (opts.layout) {
-            const layoutPath = path.join(pageDir, "layout.tsx");
-            const layoutTemplate = generateLayoutTemplate(!!opts.client);
-            await safeWrite(layoutPath, layoutTemplate, opts.force ? { force: true } : {});
-          }
-
-          // Write API route file if --api is set
-          if (opts.api) {
-            const apiPath = path.join(pageDir, "route.ts");
-            const apiTemplate = generateApiRouteTemplate();
-            await safeWrite(apiPath, apiTemplate, opts.force ? { force: true } : {});
-          }
-
-          // Write test file if --with-tests is set
-          if (opts.withTests) {
-            const testDir = path.join(pageDir, "__tests__");
-            await ensureDir(testDir);
-            const testPath = path.join(testDir, "page.test.tsx");
-            const testTemplate = generatePageTestTemplate(route);
-            await safeWrite(testPath, testTemplate, opts.force ? { force: true } : {});
-          }
-
-          // Update page manifest
-          const manifestRoute = routeSegments.join("/");
-          await updatePageManifest(appDir, manifestRoute);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (msg.includes("Invalid segment") || msg.toLowerCase().includes("invalid")) {
-            console.error("Invalid segment");
-            process.exitCode = 1;
-            throw err; // Re-throw for tests
-          } else if (msg.includes("App directory not found")) {
-            console.error(msg);
-            process.exitCode = 1;
-            throw err; // Re-throw for tests
-          } else {
-            console.error(msg);
-            process.exitCode = 1;
-            throw err; // Re-throw for tests
-          }
-        }
+        );
       }
     );
 }

@@ -136,6 +136,57 @@ describe("Doctor E2E tests", () => {
     expect(result.stdout).toMatch(/PASS|WARN|FAIL/);
   });
 
+  it("--ci with warnings exits 0 (CI-friendly)", async () => {
+    workspace = await makeTempWorkspace();
+
+    // Create setup that triggers warning (no app dir, not a Next.js project)
+    const configPath = path.join(workspace.dir, "nextforge.config.mjs");
+    await writeFile(
+      configPath,
+      `export default {
+  useTailwind: true,
+  pagesDir: "app",
+};
+`
+    );
+
+    const result = await runCli(workspace.dir, "doctor", "--ci", "--json");
+
+    // In CI mode, warnings should exit 0 (success)
+    expect(result.code).toBe(0);
+
+    // Parse JSON to verify warnings were detected
+    const json = JSON.parse(result.stdout);
+    expect(json.exitCode).toBe(1); // Internal exitCode shows warnings
+    expect(json.summary.warn).toBeGreaterThan(0);
+    expect(json.summary.fail).toBe(0);
+  });
+
+  it("--ci with failures still exits 2 (fail)", async () => {
+    workspace = await makeTempWorkspace();
+
+    // Create .ts config without tsx to trigger failure
+    const configPath = path.join(workspace.dir, "nextforge.config.ts");
+    await writeFile(
+      configPath,
+      `export default {
+  useTailwind: true,
+  pagesDir: "app",
+};
+`
+    );
+
+    const result = await runCli(workspace.dir, "doctor", "--ci", "--json");
+
+    // In CI mode, failures should still fail (exit 2)
+    expect(result.code).toBe(2);
+
+    // Parse JSON to verify failures were detected
+    const json = JSON.parse(result.stdout);
+    expect(json.exitCode).toBe(2);
+    expect(json.summary.fail).toBeGreaterThan(0);
+  });
+
   it("success case with .mjs config", async () => {
     workspace = await makeTempWorkspace();
 
