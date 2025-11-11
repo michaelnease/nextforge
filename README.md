@@ -6,6 +6,8 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 
 - **[Changelog](docs/CHANGELOG.md)** - Version history and release notes
 - **[Contributor Guide](docs/FOR_AI.md)** - Editing guide for contributors and AI assistants
+- **[Distributed Tracing](docs/tracing.md)** - Trace correlation and span trees
+- **[Data Introspection](docs/LOGGING_DATA.md)** - Safe data logging and debugging
 - **[License](docs/LICENSE)** - MIT License
 
 ---
@@ -449,6 +451,60 @@ npx nextforge add:page users --metrics json | jq '.memory | {peak: .peakMB, delt
 **Profiling Overhead:**
 
 The profiling system adds minimal overhead (typically < 5ms) when enabled. Event loop and GC monitoring are only active when `--profile` or `NEXTFORGE_PROFILE=1` is set.
+
+### Distributed Tracing
+
+NextForge includes built-in distributed tracing to correlate logs across command execution and visualize operation hierarchies.
+
+**Features:**
+
+- **Trace IDs** - Correlate all logs from a single command execution
+- **Span IDs** - Track individual operations within a command
+- **Duration measurements** - Performance analysis for each operation
+- **Hierarchical span trees** - Visual representation of operation nesting
+
+**View Trace Trees:**
+
+```bash
+# Show trace tree after command execution
+nextforge doctor --trace
+
+# Output:
+Trace:
+command:doctor (7.29 ms)
+```
+
+For complex operations with nested spans:
+
+```bash
+nextforge add:component Button --trace
+
+# Output:
+Trace:
+command:add:component (45.2 ms)
+  step:loadConfig (12.3 ms)
+  step:writeFiles (28.1 ms)
+    write:Button.tsx (15.4 ms)
+    write:index.ts (8.2 ms)
+```
+
+**Custom Trace IDs:**
+
+```bash
+# Set a custom trace ID for correlation across logs
+NEXTFORGE_TRACE_ID=my-custom-id nextforge doctor
+
+# All logs will include: "traceId": "my-custom-id"
+```
+
+**Combine with Profiling:**
+
+```bash
+# Get both trace tree and performance metrics
+nextforge add:page Dashboard --trace --profile
+```
+
+See **[docs/tracing.md](docs/tracing.md)** for complete documentation.
 
 ### Component Generation
 
