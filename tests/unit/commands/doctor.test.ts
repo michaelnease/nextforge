@@ -14,6 +14,13 @@ describe("nextforge doctor", () => {
     expect(doctorCommand.description()).toBe("Run health checks for your NextForge setup");
   });
 
+  it("should have --silent option", () => {
+    const options = doctorCommand.options;
+    const silentOption = options.find((opt) => opt.long === "--silent");
+    expect(silentOption).toBeDefined();
+    expect(silentOption?.description).toBe("Suppress human readable output");
+  });
+
   describe("nodeVersionCheck", () => {
     it("should pass when Node version satisfies engines.node", async () => {
       const result = await nodeVersionCheck.run({

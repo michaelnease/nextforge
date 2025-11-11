@@ -19,6 +19,7 @@ export const doctorCommand = new Command("doctor")
   .description("Run health checks for your NextForge setup")
   .option("--app <path>", "Path to Next.js app directory")
   .option("--json", "Output JSON instead of text")
+  .option("--silent", "Suppress human readable output")
   .option("--fix", "Try safe autofixes")
   .option("--ci", "CI-friendly mode (no colors, no prompts, warnings don't fail)")
   .option("--deep", "Run deep checks like tsc validation")
@@ -36,7 +37,7 @@ export const doctorCommand = new Command("doctor")
         logger.debug({ opts }, "Doctor command options");
         const exitCode = await runDoctor({
           ...opts,
-          silent: opts.metrics === "json",
+          silent: opts.silent || opts.json || opts.metrics === "json",
         });
 
         // In CI mode, treat warnings (exit 1) as success
@@ -56,7 +57,7 @@ export const doctorCommand = new Command("doctor")
       },
       {
         verbose: !!opts.verbose,
-        silent: opts.json || opts.metrics === "json",
+        silent: opts.silent || opts.json || opts.metrics === "json",
         profile: opts.profile,
         trace: opts.trace,
         metricsJson: opts.metrics === "json",

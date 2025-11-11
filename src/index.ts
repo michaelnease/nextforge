@@ -8,6 +8,7 @@ import { registerAddGroup } from "./commands/add/group.js";
 import { registerAddPage } from "./commands/add/page.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { initCommand } from "./commands/init.js";
+import { listCommand } from "./commands/list.js";
 
 /**
  * Detect if arguments contain shell-expanded brackets that should have been quoted.
@@ -135,6 +136,7 @@ export async function main(): Promise<void> {
   // [nextforge.register:commands:start]
   program.addCommand(doctorCommand);
   program.addCommand(initCommand);
+  program.addCommand(listCommand);
   registerAddGroup(program);
   registerAddPage(program);
   registerAddDocker(program);

@@ -59,4 +59,76 @@ describe("add:group", () => {
       /Refusing to create unsafe app directory/
     );
   });
+
+  it("creates test files with --with-tests flag", async () => {
+    const appDir = join(ws.dir, "app");
+
+    await runCLI([
+      "add:group",
+      "reports",
+      "--app",
+      appDir,
+      "--pages",
+      "summary,detail",
+      "--with-tests",
+    ]);
+
+    // Verify test files exist
+    const summaryTest = join(appDir, "(reports)", "summary", "page.test.tsx");
+    const detailTest = join(appDir, "(reports)", "detail", "page.test.tsx");
+
+    await expect(exists(summaryTest)).resolves.toBe(true);
+    await expect(exists(detailTest)).resolves.toBe(true);
+
+    // Verify test file content
+    const testContent = await readText(summaryTest);
+    expect(testContent).toContain('import { render } from "@testing-library/react"');
+    expect(testContent).toContain('import Page from "./page"');
+    expect(testContent).toContain('test("renders",');
+  });
+
+  it("creates correct structure for single page with layout (index page)", async () => {
+    const appDir = join(ws.dir, "app");
+
+    await runCLI(["add:group", "account", "--app", appDir, "--pages", "index", "--with-layout"]);
+
+    // Verify structure
+    const layoutPath = join(appDir, "(account)", "layout.tsx");
+    const indexPagePath = join(appDir, "(account)", "index", "page.tsx");
+    const readmePath = join(appDir, "(account)", "README.md");
+
+    await expect(exists(layoutPath)).resolves.toBe(true);
+    await expect(exists(indexPagePath)).resolves.toBe(true);
+    await expect(exists(readmePath)).resolves.toBe(true);
+
+    // Verify layout content
+    const layout = await readText(layoutPath);
+    expect(layout).toMatch(/export default/);
+
+    // Verify page content
+    const page = await readText(indexPagePath);
+    expect(page).toContain("index");
+  });
+
+  it("does not duplicate README when creating group with layout", async () => {
+    const appDir = join(ws.dir, "app");
+
+    await runCLI([
+      "add:group",
+      "account",
+      "--app",
+      appDir,
+      "--pages",
+      "settings,profile",
+      "--with-layout",
+    ]);
+
+    // Count README files
+    const { readdir } = await import("node:fs/promises");
+    const files = await readdir(join(appDir, "(account)"));
+    const readmeCount = files.filter((f) => f === "README.md").length;
+
+    // Should have exactly one README
+    expect(readmeCount).toBe(1);
+  });
 });

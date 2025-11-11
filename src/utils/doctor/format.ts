@@ -71,11 +71,7 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
 
   const exitCode = failed > 0 ? 2 : warned > 0 ? 1 : 0;
 
-  // Skip all output if silent mode (for --metrics=json)
-  if (flags.silent) {
-    return exitCode;
-  }
-
+  // Output JSON if --json is set, even if --silent is true
   if (flags.json) {
     console.log(
       JSON.stringify(
@@ -99,7 +95,16 @@ export function formatResults(results: DoctorResult[], flags: DoctorFlags): numb
         2
       )
     );
-  } else {
+    return exitCode;
+  }
+
+  // Skip all output if silent mode (no JSON output)
+  if (flags.silent) {
+    return exitCode;
+  }
+
+  // Normal text output
+  {
     console.log("\nNextForge Doctor Report\n");
     console.log(lines.join("\n"));
     console.log();

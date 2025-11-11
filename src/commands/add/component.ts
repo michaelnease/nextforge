@@ -279,7 +279,11 @@ async function updateKindBarrel(
     // File doesn't exist yet
   }
 
-  const needle = `export { default as ${exportName} } from "${componentPath}/${exportName}";`;
+  // Use relative path with "./" prefix and no duplicate component name
+  // For "Button" -> "./Button"
+  // For "Marketing/Hero" -> "./Marketing/Hero"
+  const relativePath = `./${componentPath.replace(/\\/g, "/")}`;
+  const needle = `export { default as ${exportName} } from "${relativePath}";`;
   if (!current.includes(needle)) {
     // Split into lines, add new export, sort, and rejoin
     const lines = current.split("\n").filter((line) => line.trim());

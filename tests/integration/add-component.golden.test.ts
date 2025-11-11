@@ -71,7 +71,7 @@ describe("add:component", () => {
     expect(code).toContain("@chakra-ui/react");
 
     const barrel = await readText("components/ui/index.ts");
-    expect(barrel).toContain('export { default as Card } from "Card/Card";');
+    expect(barrel).toContain('export { default as Card } from "./Card";');
   });
 
   it("creates a Chakra layout with children and the client directive when requested", async () => {
@@ -109,7 +109,7 @@ describe("add:component", () => {
     ]);
 
     const barrel = await readText("components/section/index.ts");
-    const needle = 'export { default as Hero } from "Marketing/Hero/Hero";';
+    const needle = 'export { default as Hero } from "./Marketing/Hero";';
     const count = (
       barrel.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []
     ).length;
@@ -359,8 +359,8 @@ describe("add:component", () => {
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
     const barrel1 = await readText("components/ui/index.ts");
     const count1 = (barrel1.match(/export \{ default as Button \}/g) || []).length;
-    // Verify POSIX path is used (forward slashes)
-    expect(barrel1).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    // Verify POSIX path is used (forward slashes) with "./" prefix
+    expect(barrel1).toMatch(/export.*from.*["'].\/Button["']/);
     expect(barrel1).not.toContain("\\");
 
     // Second run - should not duplicate
@@ -371,8 +371,8 @@ describe("add:component", () => {
     // Should have exactly one export line
     expect(count2).toBe(count1);
     expect(count1).toBe(1);
-    // Still uses POSIX paths after second run
-    expect(barrel2).toMatch(/export.*from.*["'].*Button\/Button["']/);
+    // Still uses POSIX paths after second run with "./" prefix
+    expect(barrel2).toMatch(/export.*from.*["'].\/Button["']/);
     expect(barrel2).not.toContain("\\");
   });
 
@@ -403,9 +403,9 @@ describe("add:component", () => {
     const barrel = await readText("components/ui/index.ts");
     // POSIX paths use forward slashes, even on Windows
     expect(barrel).not.toContain("\\");
-    // Verify forward slashes are used in import paths
-    expect(barrel).toMatch(/export.*from.*["'].*Button\/Button["']/);
-    expect(barrel).toMatch(/export.*from.*["'].*\/.*["']/);
+    // Verify forward slashes are used in import paths with "./" prefix
+    expect(barrel).toMatch(/export.*from.*["'].\/Button["']/);
+    expect(barrel).toMatch(/export.*from.*["']\.\/.*["']/);
   });
 
   it("framework precedence: config Tailwind but --framework chakra → Chakra output", async () => {
@@ -480,6 +480,34 @@ describe("add:component", () => {
     await runCLI(["add:component", "Button", "--group", "ui", "--app", "app", "--force"]);
     const thirdCode = await readText("components/ui/Button/Button.tsx");
     expect(thirdCode).toBe(firstCode); // Should be overwritten (same template)
+  });
+
+  it("barrel export for simple Button component uses ./Button", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "Button", "--group", "ui", "--app", "app"]);
+
+    const barrel = await readText("components/ui/index.ts");
+    expect(barrel).toContain('export { default as Button } from "./Button";');
+    expect(barrel).not.toContain("Button/Button");
+  });
+
+  it("barrel export for nested Hero component uses ./Marketing/Hero", async () => {
+    await fs.mkdir("app", { recursive: true });
+    await fs.writeFile(
+      "nextforge.config.json",
+      JSON.stringify({ useTailwind: true, useChakra: false, pagesDir: "app" }, null, 2)
+    );
+
+    await runCLI(["add:component", "marketing/Hero", "--group", "section", "--app", "app"]);
+
+    const barrel = await readText("components/section/index.ts");
+    expect(barrel).toContain('export { default as Hero } from "./Marketing/Hero";');
+    expect(barrel).not.toContain("Marketing/Hero/Hero");
   });
 
   it("--force applies to style and story files", async () => {

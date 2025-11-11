@@ -37,6 +37,7 @@ export function registerAddGroup(program: Command) {
     .argument("<name>", "Route group name, with or without parentheses, e.g. auth or (auth)")
     .option("--app <dir>", "App directory", "app")
     .option("--with-layout", "Create layout.tsx in the group", false)
+    .option("--with-tests", "Generate test files for pages", false)
     .option("--no-readme", "Skip creating a README.md")
     .option("--force", "Overwrite existing files", false)
     .option(
@@ -113,7 +114,9 @@ export function registerAddGroup(program: Command) {
             // Parse and create pages
             const pages = parsePages(opts.pages);
             for (const pageName of pages) {
-              const pageDir = path.join(groupDir, pageName);
+              // Handle "index" page specially: put it in groupDir/index/page.tsx
+              const pageDir =
+                pageName === "index" ? path.join(groupDir, "index") : path.join(groupDir, pageName);
               await ensureDir(pageDir);
               const pageFile = path.join(pageDir, "page.tsx");
               await safeWrite(
@@ -121,6 +124,24 @@ export function registerAddGroup(program: Command) {
                 pageCode(pageName),
                 opts.force ? { force: true, profiler, logger } : { profiler, logger }
               );
+
+              // Create test file if --with-tests is set
+              if (opts.withTests) {
+                const testFile = path.join(pageDir, "page.test.tsx");
+                const testCode = `import { render } from "@testing-library/react";
+import Page from "./page";
+
+// Note: This is a server component by default
+test("renders", () => {
+  render(<Page />);
+});
+`;
+                await safeWrite(
+                  testFile,
+                  testCode,
+                  opts.force ? { force: true, profiler, logger } : { profiler, logger }
+                );
+              }
             }
 
             const rel = path.relative(process.cwd(), groupDir) || groupDir;
