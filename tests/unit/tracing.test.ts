@@ -299,6 +299,46 @@ describe("Tracing", () => {
     });
   });
 
+  describe("Sibling order stability", () => {
+    it("should render siblings in chronological order by start time", async () => {
+      setTraceId("sibling-order-test");
+      const { traceId } = getTraceContext();
+      clearStoredSpans(traceId);
+
+      // Create parent span with multiple children starting at different times
+      await withTrackedSpan("parent", async () => {
+        // First child
+        await withTrackedSpan("child-a", async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        });
+
+        // Second child - starts after first completes
+        await withTrackedSpan("child-b", async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        });
+
+        // Third child - starts after second completes
+        await withTrackedSpan("child-c", async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        });
+      });
+
+      const spans = getStoredSpans(traceId);
+      const tree = formatTraceTree(spans);
+
+      // Verify tree structure - children should appear in chronological order
+      expect(tree.length).toBe(4); // parent + 3 children
+      expect(tree[0]).toMatch(/^parent/);
+      expect(tree[1]).toMatch(/^\s{2}child-a/);
+      expect(tree[2]).toMatch(/^\s{2}child-b/);
+      expect(tree[3]).toMatch(/^\s{2}child-c/);
+
+      // Verify the order is stable across multiple calls
+      const tree2 = formatTraceTree(spans);
+      expect(tree2).toEqual(tree);
+    });
+  });
+
   describe("Integration: Command-like workflow", () => {
     it("should track a complex command workflow", async () => {
       // Simulate a command execution with multiple steps

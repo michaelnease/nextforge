@@ -159,15 +159,19 @@ export function getCompletedSpans(): Span[] {
 /**
  * Format trace tree for human-readable output
  * Shows nested spans with durations
+ * Siblings are sorted chronologically by start time for deterministic output
  */
 export function formatTraceTree(spans: Span[], indent = 0): string[] {
   const lines: string[] = [];
 
+  // Sort all spans by start time for deterministic ordering
+  const sortedSpans = [...spans].sort((a, b) => Number(a.start - b.start));
+
   // Group spans by parent
-  const rootSpans = spans.filter((s) => !s.parentId);
+  const rootSpans = sortedSpans.filter((s) => !s.parentId);
   const childSpansByParent = new Map<string, Span[]>();
 
-  for (const span of spans) {
+  for (const span of sortedSpans) {
     if (span.parentId) {
       const children = childSpansByParent.get(span.parentId) || [];
       children.push(span);
@@ -181,7 +185,7 @@ export function formatTraceTree(spans: Span[], indent = 0): string[] {
     const duration = span.durationMs?.toFixed(2) || "?";
     lines.push(`${prefix}${span.name} (${duration} ms)`);
 
-    // Add children
+    // Add children (already sorted by start time)
     const children = childSpansByParent.get(span.id) || [];
     for (const child of children) {
       addSpan(child, depth + 1);

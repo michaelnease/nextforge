@@ -281,7 +281,14 @@ export async function runCommand<T = void>(
     // Set process exit code
     process.exitCode = exitCode;
 
-    // Re-throw for tests to catch
-    throw err;
+    // Re-throw for tests to catch, but not in production/CI
+    // In silent mode (--json, --metrics json), we've already output everything needed
+    // so exit gracefully without throwing to avoid stack traces in CI
+    if (process.env.NODE_ENV === "test") {
+      throw err;
+    }
+
+    // Return undefined to satisfy TypeScript - process.exitCode is already set
+    return undefined as unknown as T;
   }
 }
