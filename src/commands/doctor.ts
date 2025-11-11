@@ -7,19 +7,20 @@ import { runCommand } from "../utils/runCommand.js";
  * Doctor command - runs health checks for NextForge setup
  *
  * Exit codes:
- *   0 - All checks passed
- *   1 - Warnings found (non-critical issues)
+ *   0 - All checks passed (or only warnings in CI mode)
+ *   1 - Warnings found (non-critical issues, local mode only)
  *   2 - Failures found (critical issues)
  *   3 - Doctor crashed unexpectedly
  *
- * This convention allows CI to fail on failures (exit 2) but pass on warnings (exit 1).
+ * In CI mode (--ci flag or CI env var), warnings are treated as success (exit 0).
+ * This convention allows CI to fail only on actual failures (exit 2+).
  */
 export const doctorCommand = new Command("doctor")
   .description("Run health checks for your NextForge setup")
   .option("--app <path>", "Path to Next.js app directory")
   .option("--json", "Output JSON instead of text")
   .option("--fix", "Try safe autofixes")
-  .option("--ci", "CI-friendly mode (no colors, no prompts)")
+  .option("--ci", "CI-friendly mode (no colors, no prompts, warnings don't fail)")
   .option("--deep", "Run deep checks like tsc validation")
   .option("--verbose", "Verbose logging")
   .option("--profile", "Enable detailed performance profiling")
@@ -38,9 +39,14 @@ export const doctorCommand = new Command("doctor")
           silent: opts.metrics === "json",
         });
 
-        // If exitCode is non-zero, throw an error with the exitCode property
+        // In CI mode, treat warnings (exit 1) as success
+        // This makes the tool more CI-friendly - only fail on actual errors
+        const isCI = opts.ci || process.env.CI;
+        const shouldFail = isCI ? exitCode >= 2 : exitCode !== 0;
+
+        // If exitCode is non-zero and should fail, throw an error with the exitCode property
         // This allows runCommand to finish, log profile, and set proper exit code
-        if (exitCode !== 0) {
+        if (shouldFail) {
           const err = new Error(
             exitCode === 1 ? "Doctor found warnings" : "Doctor found failures"
           ) as Error & { exitCode: number };
