@@ -5,9 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - TBD
+## [Unreleased]
 
 ### Added
+
+- **Distributed Tracing System**
+  - Trace IDs for correlating logs across command execution
+  - Span IDs for tracking individual operations within commands
+  - Human-readable trace trees with `--trace` flag
+  - Custom trace ID support via `NEXTFORGE_TRACE_ID` env var
+  - AsyncLocalStorage-based context propagation
+  - Automatic trace context injection into all logs
+  - Final summary logs with traceId and exitCode
+
+- **Data Introspection (`--log-data`)**
+  - Safe data logging for debugging command execution
+  - Three modes: `off`, `summary` (512 bytes), `full` (4096 bytes)
+  - Automatic redaction of sensitive keys (passwords, tokens, API keys)
+  - Custom redaction with `--redact` flag
+  - Disable redaction for local dev with `--no-redact`
+  - Structured logging with labels, hashes, and byte counts
+
+- **Performance Profiling (`--profile`)**
+  - Wall time, CPU usage, and memory tracking
+  - Event loop delay monitoring (p50, p90, p99, max)
+  - Garbage collection event tracking by type
+  - I/O operation counting and byte tracking
+  - Human-readable and JSON output formats
+  - Metrics-only mode with `--metrics json`
 
 - **Component Generation Command (`add:component`)**
   - Support for component groups: `ui`, `layout`, `section`, `feature`
@@ -37,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Diagnostics (`doctor` command)**
   - Project health checks and diagnostics
+  - CI-friendly mode with `--ci` flag (warnings don't fail builds)
+  - JSON output with `--json` flag
+  - Exit code conventions: 0 (pass), 1 (warnings), 2 (failures)
 
 - **CI/CD**
   - GitHub Actions workflow with Node.js 18, 20, and 22 support
@@ -46,9 +74,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Doctor command**: In CI mode (`--ci` flag or `CI` env var), warnings (exit code 1) now exit with 0 to allow CI builds to pass
 - Improved error messages with explicit allowed values
-- Enhanced logging with relative paths
+- Enhanced logging with relative paths and structured JSON
 - Consistent cross-platform path handling (POSIX normalization)
+- All commands now support `--trace`, `--profile`, and `--log-data` flags
 
 ### Fixed
 
@@ -56,6 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manifest write atomicity and uniqueness
 - Cross-platform import path consistency
 - File newline preservation
+- Trace context propagation across async operations
+- Final summary logs emitted in both success and failure cases
 
 ### Documentation
 
