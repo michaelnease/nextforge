@@ -182,9 +182,7 @@ export function registerAddPage(program: Command) {
 
               // Write test file if --with-tests is set
               if (opts.withTests) {
-                const testDir = path.join(pageDir, "__tests__");
-                await ensureDir(testDir);
-                const testPath = path.join(testDir, "page.test.tsx");
+                const testPath = path.join(pageDir, "page.test.tsx");
                 const testTemplate = generatePageTestTemplate(route);
                 await safeWrite(
                   testPath,

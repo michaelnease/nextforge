@@ -9,6 +9,7 @@ import {
   makeTestSource,
 } from "../../generators/components.js";
 import { cssModuleTemplate, storyTemplate } from "../../templates/index.js";
+import { upsertExport } from "../../utils/barrel.js";
 import { flagsFrom, resolveFramework } from "../../utils/framework.js";
 import { ensureDir, safeWrite } from "../../utils/fsx.js";
 import { updateComponentManifest } from "../../utils/manifest.js";
@@ -215,10 +216,11 @@ export function registerAddComponent(program: Command) {
             const barrelComponentPath = nestedPath
               ? `${nestedPath}/${componentName}`
               : componentName;
-            await updateKindBarrel(
+            // Always use POSIX separators for barrel exports
+            const barrelRelativePath = `./${barrelComponentPath.replace(/\\/g, "/")}`;
+            await upsertExport(
               path.join(componentsRoot, group, "index.ts"),
-              barrelComponentPath,
-              componentName
+              `export { default as ${componentName} } from "${barrelRelativePath}"`
             );
 
             // Manifest
@@ -256,41 +258,4 @@ export function registerAddComponent(program: Command) {
         );
       }
     );
-}
-
-/**
- * Update per-kind barrel file
- * @param barrelPath - Path to the barrel file
- * @param componentPath - Full path to component (e.g., "Marketing/Hero" or "Button")
- * @param exportName - Name to export as (e.g., "Hero" or "Button")
- */
-async function updateKindBarrel(
-  barrelPath: string,
-  componentPath: string,
-  exportName: string
-): Promise<void> {
-  const fs = await import("node:fs/promises");
-  await fs.mkdir(path.dirname(barrelPath), { recursive: true });
-
-  let current = "";
-  try {
-    current = await fs.readFile(barrelPath, "utf8");
-  } catch {
-    // File doesn't exist yet
-  }
-
-  // Use relative path with "./" prefix and no duplicate component name
-  // For "Button" -> "./Button"
-  // For "Marketing/Hero" -> "./Marketing/Hero"
-  const relativePath = `./${componentPath.replace(/\\/g, "/")}`;
-  const needle = `export { default as ${exportName} } from "${relativePath}";`;
-  if (!current.includes(needle)) {
-    // Split into lines, add new export, sort, and rejoin
-    const lines = current.split("\n").filter((line) => line.trim());
-    lines.push(needle);
-    lines.sort();
-    current = lines.join("\n") + "\n";
-  }
-
-  await fs.writeFile(barrelPath, current, "utf8");
 }
