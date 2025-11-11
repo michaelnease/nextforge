@@ -10,7 +10,7 @@ import {
   generatePageTestTemplate,
 } from "../../templates/index.js";
 import { ensureDir, safeWrite } from "../../utils/fsx.js";
-import { logData, buildPreview, isTextLike } from "../../utils/log-data.js";
+import { logData, buildPreview } from "../../utils/log-data.js";
 import { updatePageManifest } from "../../utils/manifest.js";
 import { resolveAppRoot } from "../../utils/resolveAppRoot.js";
 import { runCommand } from "../../utils/runCommand.js";
@@ -32,6 +32,7 @@ export function registerAddPage(program: Command) {
     .option("--with-tests", "Create test file", false)
     .option("--verbose", "Verbose logging", false)
     .option("--profile", "Enable detailed performance profiling")
+    .option("--trace", "Output trace tree showing spans and durations")
     .option("--metrics <format>", "Output performance metrics (format: json)")
     .option("--log-data <mode>", "Log data introspection mode: off, summary, full")
     .option("--redact <keys>", "Additional comma-separated keys to redact")
@@ -51,6 +52,7 @@ export function registerAddPage(program: Command) {
           withTests?: boolean;
           verbose?: boolean;
           profile?: boolean;
+          trace?: boolean;
           metrics?: string;
           logData?: string;
           redact?: string;
@@ -146,16 +148,8 @@ export function registerAddPage(program: Command) {
                 const template = generatePageTemplate(!!opts.client, !!opts.async, lastSegment);
 
                 // Log rendered preview (content safe-logged based on mode)
-                if (isTextLike(pagePath)) {
-                  const preview = buildPreview(template);
-                  logData(logger, "file.preview:page.tsx", { path: pagePath, ...preview });
-                } else {
-                  // Non-text files: log only path and size
-                  logData(logger, "file.preview:page.tsx", {
-                    path: pagePath,
-                    bytes: Buffer.byteLength(template, "utf8"),
-                  });
-                }
+                const preview = buildPreview(template);
+                logData(logger, "file.preview:page.tsx", { path: pagePath, ...preview });
 
                 await safeWrite(
                   pagePath,
@@ -228,6 +222,7 @@ export function registerAddPage(program: Command) {
           {
             verbose: opts.verbose,
             profile: opts.profile,
+            trace: opts.trace,
             metricsJson: opts.metrics === "json",
             logData: opts.logData,
             redact: opts.redact,

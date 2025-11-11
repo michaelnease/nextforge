@@ -3,6 +3,14 @@ import os from "node:os";
 
 import type { Logger } from "pino";
 
+import {
+  setTraceId,
+  getTraceContext,
+  withTrackedSpan,
+  getStoredSpans,
+  clearStoredSpans,
+  formatTraceTree,
+} from "../core/tracing.js";
 import { setLogDataMode, setExtraRedactKeys, logData, type LogDataMode } from "./log-data.js";
 import { createLogger } from "./logger.js";
 import { Profiler, formatProfileSummary, type ProfileSummary } from "./profiler.js";
@@ -15,6 +23,7 @@ export interface RunCommandOptions {
   logData?: string | undefined; // Data introspection mode
   redact?: string | undefined; // Additional keys to redact
   noRedact?: boolean | undefined; // Disable redaction
+  trace?: boolean | undefined; // Enable trace output
 }
 
 export interface CommandContext {
@@ -34,6 +43,9 @@ export async function runCommand<T = void>(
 ): Promise<T> {
   const runId = randomUUID();
   const startTime = Date.now();
+
+  // Initialize trace context
+  setTraceId(process.env.NEXTFORGE_TRACE_ID);
 
   // Set up log data mode
   if (
@@ -97,11 +109,14 @@ export async function runCommand<T = void>(
   let profile: ProfileSummary | undefined;
 
   try {
-    // Execute the command action
-    const result = await action({ logger, profiler });
+    // Execute the command action wrapped in a span
+    const result = await withTrackedSpan(`command:${commandName}`, async () => {
+      return await action({ logger, profiler });
+    });
 
     // Calculate duration
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    const totalMs = Date.now() - startTime;
 
     // Set explicit exit code for success
     process.exitCode = 0;
@@ -109,13 +124,16 @@ export async function runCommand<T = void>(
     // Finish profiling
     profile = profiler.finish(true);
 
+    // Get trace context for final log
+    const { traceId } = getTraceContext();
+
     // Output metrics JSON if requested
     if (metricsJson) {
       console.log(JSON.stringify(profile, null, 2));
       return result;
     }
 
-    // Log success with profile summary
+    // Log success with profile summary and trace info
     logger.info(
       {
         event: "finished",
@@ -123,9 +141,33 @@ export async function runCommand<T = void>(
         duration: `${duration}s`,
         exitCode: 0,
         profile,
+        totalMs,
       },
       `Command completed successfully in ${duration}s`
     );
+
+    // Log final command complete summary
+    logger.info(
+      {
+        msg: "command complete",
+        command: commandName,
+        totalMs,
+        traceId,
+      },
+      `Command complete: ${commandName}`
+    );
+
+    // Output human-readable trace tree if --trace flag is set
+    if (options.trace && !options.silent && traceId) {
+      const spans = getStoredSpans(traceId);
+      if (spans.length > 0) {
+        console.log("\nTrace:");
+        const tree = formatTraceTree(spans);
+        tree.forEach((line) => console.log(line));
+        console.log();
+      }
+      clearStoredSpans(traceId);
+    }
 
     // Log human-readable profile summary if profiling enabled
     if (enableProfiling && !options.silent) {
@@ -137,6 +179,7 @@ export async function runCommand<T = void>(
   } catch (err) {
     // Calculate duration
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    const totalMs = Date.now() - startTime;
 
     // Determine exit code from error if available
     const exitCode =
@@ -146,6 +189,9 @@ export async function runCommand<T = void>(
 
     // Finish profiling with error
     profile = profiler.finish(false, err);
+
+    // Get trace context for final log
+    const { traceId } = getTraceContext();
 
     // Output metrics JSON if requested
     if (metricsJson) {
@@ -194,9 +240,34 @@ export async function runCommand<T = void>(
         exitCode,
         error: errorObj,
         profile,
+        totalMs,
       },
       `Command ${statusMessage} after ${duration}s: ${err instanceof Error ? err.message : String(err)}`
     );
+
+    // Log final command complete summary (even on failure)
+    logger.info(
+      {
+        msg: "command complete",
+        command: commandName,
+        totalMs,
+        traceId,
+        exitCode,
+      },
+      `Command complete: ${commandName} (exit ${exitCode})`
+    );
+
+    // Output human-readable trace tree if --trace flag is set
+    if (options.trace && !options.silent && traceId) {
+      const spans = getStoredSpans(traceId);
+      if (spans.length > 0) {
+        console.log("\nTrace:");
+        const tree = formatTraceTree(spans);
+        tree.forEach((line) => console.log(line));
+        console.log();
+      }
+      clearStoredSpans(traceId);
+    }
 
     // Log human-readable profile summary if profiling enabled
     if (enableProfiling && !options.silent) {
@@ -209,8 +280,7 @@ export async function runCommand<T = void>(
     // Set process exit code
     process.exitCode = exitCode;
 
-    // Don't re-throw - we've logged the error and set exit code
-    // Commands can check process.exitCode if needed
-    return undefined as unknown as T;
+    // Re-throw for tests to catch
+    throw err;
   }
 }

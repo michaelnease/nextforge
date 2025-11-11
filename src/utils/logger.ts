@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import pinoLogger from "pino";
 import type { Logger } from "pino";
 
+import { getTraceContext } from "../core/tracing.js";
+
 // eslint-disable-next-line import/no-named-as-default-member
 const { multistream, stdTimeFunctions, transport } = pinoLogger;
 
@@ -167,6 +169,21 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
 
   let logger: Logger;
 
+  // Mixin to inject trace context into every log entry
+  const traceMixin = () => {
+    const traceContext = getTraceContext();
+    const result: Record<string, string> = {};
+
+    if (traceContext.traceId) {
+      result.traceId = traceContext.traceId;
+    }
+    if (traceContext.spanId) {
+      result.spanId = traceContext.spanId;
+    }
+
+    return result;
+  };
+
   // If silent mode, only log to file
   if (ctx.silent) {
     logger = pinoLogger(
@@ -174,6 +191,7 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
         level,
         base: baseContext,
         timestamp: stdTimeFunctions.isoTime,
+        mixin: traceMixin,
       },
       fileStream
     );
@@ -184,6 +202,7 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
         level,
         base: baseContext,
         timestamp: stdTimeFunctions.isoTime,
+        mixin: traceMixin,
       },
       multistream([
         { stream: process.stdout },
@@ -197,7 +216,7 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
       options: {
         colorize: true,
         translateTime: "HH:MM:ss",
-        ignore: "pid,hostname,version,nodeVersion,platform,gitSha",
+        ignore: "pid,hostname,version,nodeVersion,platform,gitSha,traceId,spanId",
         messageFormat: "{if cmd}[{cmd}] {end}{msg}",
       },
     });
@@ -206,6 +225,7 @@ export function createLogger(ctx: LoggerContext = {}): Logger {
       {
         level,
         base: baseContext,
+        mixin: traceMixin,
       },
       multistream([
         { stream: prettyStream },

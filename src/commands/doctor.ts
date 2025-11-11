@@ -23,6 +23,7 @@ export const doctorCommand = new Command("doctor")
   .option("--deep", "Run deep checks like tsc validation")
   .option("--verbose", "Verbose logging")
   .option("--profile", "Enable detailed performance profiling")
+  .option("--trace", "Output trace tree showing spans and durations")
   .option("--metrics <format>", "Output performance metrics (format: json)")
   .option("--log-data <mode>", "Log data introspection mode: off, summary, full")
   .option("--redact <keys>", "Additional comma-separated keys to redact")
@@ -51,6 +52,7 @@ export const doctorCommand = new Command("doctor")
         verbose: !!opts.verbose,
         silent: opts.json || opts.metrics === "json",
         profile: opts.profile,
+        trace: opts.trace,
         metricsJson: opts.metrics === "json",
         logData: opts.logData,
         redact: opts.redact,

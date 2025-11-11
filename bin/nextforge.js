@@ -28,5 +28,9 @@ if (!main) {
 
 main().catch((err) => {
   console.error(err?.stack || String(err));
-  process.exitCode = 1;
+  // Respect exit code if already set (e.g., by runCommand)
+  // Otherwise use exitCode from error, or default to 1
+  if (process.exitCode === undefined || process.exitCode === 0) {
+    process.exitCode = err?.exitCode || err?.code || 1;
+  }
 });
