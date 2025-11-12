@@ -172,7 +172,7 @@ import {
   withTrackedSpan,
   getStoredSpans,
   formatTraceTree,
-} from "@forged/nextforge/core/tracing";
+} from "@forgefoundry/nextforge/core/tracing";
 
 // Set custom trace ID
 setTraceId("my-custom-trace");

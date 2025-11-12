@@ -1,4 +1,4 @@
-# @forged/nextforge
+# @forgefoundry/nextforge
 
 A modern CLI tool for Next.js project scaffolding and management, built with TypeScript and ESM.
 
@@ -89,7 +89,7 @@ A modern CLI tool for Next.js project scaffolding and management, built with Typ
 ## Quick start
 
 ```bash
-npm i -D @forged/nextforge
+npm i -D @forgefoundry/nextforge
 
 npx nextforge --help
 npx nextforge doctor
@@ -98,13 +98,13 @@ npx nextforge doctor
 ## Installation
 
 ```bash
-npm install -g @forged/nextforge
+npm install -g @forgefoundry/nextforge
 ```
 
 Or use with npx:
 
 ```bash
-npx @forged/nextforge
+npx @forgefoundry/nextforge
 ```
 
 ## Usage
@@ -1273,12 +1273,12 @@ To remove NextForge from your project:
 
 ```bash
 # If installed globally
-npm uninstall -g @forged/nextforge
+npm uninstall -g @forgefoundry/nextforge
 
 # If installed as dev dependency
-npm uninstall -D @forged/nextforge
+npm uninstall -D @forgefoundry/nextforge
 # or
-pnpm remove -D @forged/nextforge
+pnpm remove -D @forgefoundry/nextforge
 ```
 
 ### 2. Clean up generated files (optional)

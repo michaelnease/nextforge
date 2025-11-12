@@ -1,5 +1,5 @@
 {
-  "name": "@forged/nextforge",
+  "name": "@forgefoundry/nextforge",
   "version": "0.1.0",
   "description": "A CLI tool for Next.js project scaffolding and management",
   "type": "module",
