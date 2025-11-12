@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { makeTempWorkspace } from "../utils/tempWorkspace.js";
+import { makeTempWorkspace, writeJson } from "../utils/tempWorkspace.js";
 
 import { doctorCommand } from "../../src/commands/doctor.js";
 
@@ -108,6 +108,14 @@ describe("doctor --silent mode", () => {
     program.addCommand(doctorCommand);
     program.exitOverride();
     program.configureOutput({ outputError: () => {} });
+
+    // Create package.json with next dependency to ensure it's detected as a Next.js project
+    // This makes the missing app directory a FAILURE (exit 2) instead of a WARNING (exit 1)
+    // In CI mode, warnings are treated as success, but failures always throw
+    await writeJson(join(ws.dir, "package.json"), {
+      name: "test-project",
+      dependencies: { next: "^14.0.0" },
+    });
 
     // Don't create app directory - this should cause a failure
     let exitCode = 0;
